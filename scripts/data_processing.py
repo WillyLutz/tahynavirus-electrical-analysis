@@ -12,52 +12,86 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 
-def concatenate_datasets():
-    print()
-
-
-def make_highest_features_dataset_from_complete_dataset(foi, complete_dataset, percentage=0.05, save=False):
+def make_highest_features_dataset_from_complete_dataset(foi, df, percentage=0.05, save=False):
     """
-    Extract columns corresponding to features of interest from a complete dataset and saves/returns it.
+    make_highest_features_dataset_from_complete_dataset(foi, df, percentage=0.05, save=False):
 
-    :param foi: the columns names of the features of interests
-    :param complete_dataset: the complete dataset to extract the features from.
-    :param percentage: for the title. Corresponding percentage for the highest features of interest.
-    :return: dataframe of interest
+        Considering a DataFrame dataset, with for each column a feature, returns
+        a dataframe with only a selection of columns.
+
+        Parameters
+        ----------
+        foi: list of int
+            features of interest.
+        df: DataFrame
+            the dataset to extract columns from.
+        percentage: float, optional, default: 0.05
+            for the name of the dataset. The percentage of features that are kept.
+        save: bool, optional, default: False
+            Whether to save the resulting dataframe.
+
+        Returns
+        -------
+        out: DataFrame
+            reduced dataframe columns-wise.
     """
-    df_foi = complete_dataset[[f for f in foi]]
-    df_foi["status"] = complete_dataset["status"]
+    df_foi = df[[f for f in foi]]
+    df_foi["status"] = df["status"]
     if save:
-        df_foi.to_csv(os.path.join(os.path.dirname(complete_dataset), f"highest {percentage * 100}% features - "
-                                                                      f"{os.path.basename(complete_dataset)}"),
+        df_foi.to_csv(os.path.join(os.path.dirname(df), f"highest {percentage * 100}% features - "
+                                                                      f"{os.path.basename(df)}"),
                       index=False)
     return df_foi
 
 
-def make_raw_frequency_plots_from_pr_files(parent_dir, to_include=(), to_exclude=(), save=False, show=False,
+def make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=(), save=False, show=False,
                                            verbose=False):
-    all_files = ff.get_all_files(os.path.join(parent_dir))
+    """
+    make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=(), save=False, show=False,
+                                           verbose=False):
+
+        plot the amplitude depending on the frequencies from pre-processed
+        files.
+
+        Parameters
+        ----------
+        parent_dir: 'str'
+            the oldest parent from which we will parse files to extract data.
+        to_include : tuple of str
+            Allow to select children paths of parent_dir. All the
+            elements in to_include must be present in the path for it to be
+            selected.
+        to_exclude : tuple of str, optional, default: ()
+            Allow to select children paths of parent_dir. A path
+            will not be selected if any element of to_exclude is present
+            in the path.
+        save: bool, optional, default: False
+            Whether to save or not the resulting figure.
+        show: bool, optional, default: False
+            Whether to show or not the resulting figure.
+        verbose: bool, optional, default: False
+            Whether to display or not more processing information in the console.
+
+        Returns
+        -------
+        out: plt.Axes
+            the resulting figure
+    """
+    all_files = ff.get_all_files(parent_dir)
     files = []
     organoids = []
     for f in all_files:
         if all(i in f for i in to_include) and (not any(e in f for e in to_exclude)):
             files.append(f)
-
             organoid_key = os.path.basename(Path(f).parent.parent.parent.parent) + "_" + \
                            os.path.basename(Path(f).parent.parent) + "_" + os.path.basename(Path(f).parent)
             if organoid_key not in organoids:
                 organoids.append(organoid_key)  # for parent: P.NOSTACHEL ==> - StachelINF2
-
             if verbose:
                 print("added: ", f)
     number_of_organoids = len(organoids)
-
     print(number_of_organoids, organoids)
-    columns = list(range(0, 300))
-    dataset = pd.DataFrame(columns=columns)
-    target = pd.DataFrame(columns=["status", ])
 
-    n_processed_files = 0
     infected_organoids = []
     non_infected_organoids = []
     for f in files:
@@ -66,22 +100,18 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include=(), to_exclude
                        os.path.basename(Path(f).parent.parent) + "_" + os.path.basename(Path(f).parent)
 
         df = pd.read_csv(f)
-
-        df_top = top_N_electrodes(df, 35, "TimeStamp [µs]")
-
+        df_top = top_n_electrodes(df, 35, "TimeStamp [µs]")
         channels = df_top.columns
-
         fft_all_channels = pd.DataFrame()
 
-        # fft of the signal
         for ch in channels[1:]:
             filtered = spr.butter_filter(df_top[ch], order=3, lowcut=50)
             clean_fft, clean_freqs = spr.fast_fourier(filtered, 10000)
             fft_all_channels[ch] = clean_fft
             fft_all_channels["Frequency [Hz]"] = clean_freqs
-        # mean between the topped channels
+
         df_mean = merge_all_columns_to_mean(fft_all_channels, "Frequency [Hz]").round(3)
-        downsampled_df = down_sample(df_mean["mean"], 300, 'mean')
+        downsampled_df = smoothing(df_mean["mean"], 300, 'mean')
         if "TAHV" in organoid_key:
             infected_organoids.append(downsampled_df)
             print("added infected: ", organoid_key, len(downsampled_df))
@@ -127,41 +157,46 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include=(), to_exclude
         plt.show()
     return ax
 
-    #
-    #
-    #
-    #     # construct the dataset with n features
-    #     dataset.loc[len(dataset)] = downsampled_df
-    #
-    #     path = Path(f)
-    #     if "NI" in os.path.basename(path.parent.parent):
-    #         target.loc[len(target)] = 0
-    #     elif "INF" in os.path.basename(path.parent.parent):
-    #         target.loc[len(target)] = 1
-
-    # if verbose:
-    #     progress = int(np.ceil(n_processed_files / len(files) * 100))
-    #     sys.stdout.write(f"\rProgression of processing all_files: {progress}%")
-    #     sys.stdout.flush()
-    #     n_processed_files += 1
-
-
-def make_dataset_from_freq_files(parent_directories, commentary="", targets=(), to_include=(), to_exclude=(), save=False, verbose=False):
+def make_dataset_from_freq_files(parent_directories, targets, to_include, to_exclude=(), save=False, verbose=False, commentary="",):
     """
-    Use frequency files of format two columns (one column 'Frequencies [Hz]' and one column 'mean') to generate a
-    dataset used for classification.
+    make_dataset_from_freq_files(parent_directories, commentary="", targets=(), to_include=(), to_exclude=(), save=False, verbose=False)
 
-    :param to_exclude:
-    :param to_include:
-    :param timepoint: The time point to study.
-    :param title: name of the resulting dataset.
-    :param parent_directories: list of the names of the parent directory that contains all files to make the dataset from.
-    :return:
+        Return a pandas Dataframe where each row is an entry for a machine lerning model. Use frequency files and smoothen
+        them down to 300 values used as features.
 
-    Args:
-        y_vector:
+        Parameters
+        ----------
+        parent_directories : tuple of str
+            System paths from where the searching for frequency files will r
+            ecursively occur
+        targets : tuple of str
+            Name of the targets we want to classify on. They must be written
+            in the path as the grand-grand-parent of the frequency file.
+        to_include : tuple of str
+            Allow to select children paths of parent_directories. All the
+            elements in to_include must be present in the path for it to be
+            selected.
+        to_exclude : tuple of str
+            Allow to select children paths of parent_directories. A path
+            will not be selected if any element of to_exclude is present
+            in the path.
+        save : bool, optional, default: False
+            Whether we save the resulting dataframe as a .csv file or not.
+        verbose : bool, optional, default: False
+            Whether to print more information on the processing or not.
+
+            .. versionadded:: 1.0.0
+
+        Returns
+        -------
+        out : dataframe
+            a pandas Dataframe where each row is an entry for a machine
+            learning model. Use frequency files and smoothen them down
+            to 300 values used as features. Has a last column as 'target'
+            containing the target value for each entry based on the
+            original path of the file where it came from.
+
     """
-    # todo : documentation
 
     freq_files = []
     for parent_dir in parent_directories:
@@ -177,19 +212,12 @@ def make_dataset_from_freq_files(parent_directories, commentary="", targets=(), 
     title = commentary + ""
 
     n_processed_files = 0
-    target_id = 0
-    targets_correspondence = {}
 
     for f in freq_files:
         df = pd.read_csv(f)
-        # Downsampling by n
-        downsampled_df = down_sample(df["mean"], 300, 'mean')
-
-        # construct the dataset with n features
+        downsampled_df = smoothing(df["mean"], 300, 'mean')
         dataset.loc[len(dataset)] = downsampled_df
-
-        path = Path(f)
-        target.loc[len(target)] = os.path.basename(path.parent.parent)
+        target.loc[len(target)] = os.path.basename(Path(f).parent.parent)
 
         if verbose:
             progress = int(np.ceil(n_processed_files / len(freq_files) * 100))
@@ -206,9 +234,16 @@ def make_dataset_from_freq_files(parent_directories, commentary="", targets=(), 
 
 def make_filtered_sampled_freq_files():
     """
-    make frequency files of format two columns (one column 'Frequencies [Hz]' and one column 'mean') from raw files.
+    make_filtered_sampled_freq_files():
 
-    :return:
+        make frequency files of format two columns (one column 'Frequencies [Hz]'
+        and one column 'mean') from raw files. Save every sample as a different
+        file. Without parameters, this function is a process by itself.
+
+        Parameters
+        ----------
+        Returns
+        -------
     """
     for timepoint in ("T=0MIN", "T=30MIN", "T=48H", "T=96H"):
         for rg27 in (P.RG27, P.NORG27):
@@ -221,7 +256,7 @@ def make_filtered_sampled_freq_files():
             for f in raw_files:
                 print(f)
                 df = pd.read_csv(f)
-                df_top = top_N_electrodes(df, 35, "TimeStamp")
+                df_top = top_n_electrodes(df, 35, "TimeStamp")
                 samples = equal_samples(df_top, 30)
                 channels = df_top.columns
                 n_sample = 0
@@ -244,60 +279,28 @@ def make_filtered_sampled_freq_files():
                     n_sample += 1
 
 
-def make_filtered_numbered_freq_files(mono_time, top_n=35, truncate=30, n_features=300, lowcut=10):
-    files = ff.get_all_files("E:\\Organoids\\four organoids per label\\")
-    paths_pr = []
-    columns = list(range(0, n_features))
+def smoothing(data, n: int, mode='mean'):
+    """
+    smoothing(data, n: int, mode: str):
 
-    dataset = pd.DataFrame(columns=columns)
-    identities = pd.DataFrame(columns=["organoid number", ])
-    target = pd.DataFrame(columns=["status", ])
-    for f in files:
-        if "pr_" in f:
-            paths_pr.append(f)
-    print(paths_pr)
-    for p in paths_pr:
-        if p.split("\\")[3] == mono_time:
-            print("path = ", p)
-            df = pd.read_csv(p)
-            # selecting top channels by their std
+        Smoothen a signal down to n values, depending on the
+        smoothing mode.
 
-            df_top = top_N_electrodes(df, top_n, "TimeStamp")
+        Parameters
+        ----------
+        data: list of int, list of float
+            contains the numerical data to smoothen.
+        n: int
+            number of points to down sample the data to.
+        mode: str, optional, default: 'mean'
+            the way to smoothen the data between the points.
 
-            samples = equal_samples(df_top, truncate)
-            channels = df_top.columns
-            for df_s in samples:
-                fft_all_channels = pd.DataFrame()
+        Returns
+        -------
+        out: list of floats
+            the smoothened data.
 
-                # fft of the signal
-                for ch in channels[1:]:
-                    filtered = spr.butter_filter(df_s[ch], order=3, lowcut=lowcut)
-                    clean_fft, clean_freqs = spr.fast_fourier(filtered, 10000)
-                    fft_all_channels[ch] = clean_fft
-                    fft_all_channels["frequency"] = clean_freqs
-                # mean between the topped channels
-                df_mean = merge_all_columns_to_mean(fft_all_channels, "frequency").round(3)
-
-                # Downsampling by n
-                downsampled_df = down_sample(df_mean["mean"], n_features, 'mean')
-
-                # construct the dataset with n features
-                dataset.loc[len(dataset)] = downsampled_df
-                identities.loc[len(identities)] = p.split("\\")[5]
-                if p.split("\\")[4] == "NI":
-                    target.loc[len(target)] = 0
-                elif p.split("\\")[4] == "INF":
-                    target.loc[len(target)] = 1
-
-    dataset.insert(loc=0, column="organoid number", value=identities["organoid number"])
-    dataset["status"] = target["status"]
-    folder = "Four organoids\\datasets\\"
-    ff.verify_dir(folder)
-    title = f"{folder}filtered_{lowcut}_numbered_frequency_top{str(top_n)}_nfeatures_{n_features}_{mono_time}.csv"
-    dataset.to_csv(title, index=False)
-
-
-def down_sample(data, n: int, mode: str):
+    """
     if len(data.index) > n:
         step = int(len(data.index) / n)
         lower_limit = 0
@@ -316,6 +319,23 @@ def down_sample(data, n: int, mode: str):
 
 
 def equal_samples(df, n):
+    """
+    equal_samples(df, n):
+
+        cuts a DataFrame in n sub-DataFrame of same length.
+
+        Parameters
+        ----------
+        df: DataFrame
+            Object to cut, row-wise.
+        n: int
+            number of resulting samples.
+
+        Returns
+        -------
+        out: list of DataFrame
+            contains all the sub DataFrames.
+    """
     step = int(len(df) / n)
     lower_limit = 0
     upper_limit = step
@@ -327,77 +347,73 @@ def equal_samples(df, n):
     return samples
 
 
-def make_freq_file(path, channels, file_path):
+def dataframe_to_frequencies(df, file_path="", sf=10000):
     """
-    Make the fft of a temporal signal file and save it
-    :param path: path of the temporal signal file
-    :param channels: all the column to apply the fft to.
-    :param file_path: path of the new file
-    :return:
+    dataframe_to_frequencies(df, file_path="", sf=10000):
+
+        Applies a fast fourier transform to all the columns of a dataframe
+        except the first one.
+
+        Parameters
+        ----------
+        df: DataFrame
+            the data in temporal domain. The first column will be
+            considered as the time axis.
+        file_path: str, optional, default: ""
+            If file_path is not empty, then it is the name under
+            which the frequency dataframe will be saved.
+        sf: int, optional, default: 10000
+            sampling frequency, in Hertz.
+
+        Returns
+        -------
+        out: DataFrame
+            the dataframe in frequencies domain.
+
     """
-    df = pd.read_csv(path)
     freq_df = pd.DataFrame()
+    channels = df.columns
     for channel in channels[1:]:
-        clean_fft, clean_freq = spr.fast_fourier(df[channel], 10000)
-        freq_df["frequency"] = clean_freq
+        clean_fft, clean_freq = spr.fast_fourier(df[channel], sf)
+        freq_df["Frequency [Hz]"] = clean_freq
         freq_df[channel] = clean_fft
 
     folder_path = os.path.dirname(file_path)
     isExist = os.path.exists(folder_path)
-    if not isExist:
-        os.makedirs(folder_path)
-        freq_df.to_csv(file_path, index=False)
-    else:
-        freq_df.to_csv(file_path, index=False)
-
-
-def clean_std_threshold(df, threshold):
-    """
-    generate a dataframe where some channels are omitted because of their too low standard deviation based on the
-    threshold.
-
-    :param df: dataframe in the frequencies domain.
-    :param threshold: acceptable standard deviation compared to max and min std of all channels. Between 0 and 1.
-    :return:
-    """
-    chans = []  # all the headers
-    for col in df.columns:
-        chans.append(col)
-
-    # getting the std
-    standards = {}
-    for ch in chans:
-        standards[ch] = np.std(df[ch])
-
-    # keeping the channel or not
-    min_key = min(standards, key=standards.get)
-    min_value = standards.get(min_key)
-    max_key = max(standards, key=standards.get)
-    max_value = standards.get(max_key)
-    limit = min_value + threshold * (max_value - min_value)
-    clean_channels = []
-    for key in standards:
-        if standards.get(key) > limit:
-            clean_channels.append(key)
-
-    dfc = pd.DataFrame()  # cleaned dataframe
-    dfc["frequency"] = df["frequency"]
-    dfc[clean_channels] = df[clean_channels]
-
-    return dfc
-    # write new file
-    # folder_path = "exp_may2021freq_std_clean_" + str(threshold) + "/" + path.split("/")[1]
-    # isExist = os.path.exists(folder_path)
-    # if not isExist:
-    #     os.makedirs(folder_path)
-    #     dfc.to_csv(folder_path + "/std_cleaned_freq.csv", index=False)
-    # else:
-    #     dfc.to_csv(folder_path + "/std_cleaned_freq.csv", index=False)
+    if file_path:
+        if not isExist:
+            os.makedirs(folder_path)
+            freq_df.to_csv(os.path.join(P.DATASETS, file_path), index=False)
+        else:
+            freq_df.to_csv(os.path.join(P.DATASETS, file_path), index=False)
+    return freq_df
 
 
 def merge_all_columns_to_mean(df: pd.DataFrame, except_column=""):
+    """
+    merge_all_columns_to_mean(df: pd.DataFrame, except_column=""):
+
+        average all the columns, except an optional specified one,
+        in a dataframe into one. The average is done row-wise.
+
+        Parameters
+        ----------
+        df: DataFrame
+            the dataframe to average
+        except_column: str, optional, default: ""
+            the name of the column to exclude from the average.
+            Will be included in the resulting dataset.
+
+        Returns
+        --------
+        out: DataFrame
+            Dataframe containing on column labeled 'mean', and
+            an optional second column based on the
+            except_column parameter
+    """
+
     excepted_column = pd.DataFrame()
-    if except_column != "":
+    if except_column:
         for col in df.columns:
             if except_column in col:
                 except_column = col
@@ -416,25 +432,69 @@ def merge_all_columns_to_mean(df: pd.DataFrame, except_column=""):
     return df_mean
 
 
-def top_N_electrodes(df, n, except_column):
+def top_n_electrodes(df, n, except_column="TimeStamp [µs]"):
     """
-    keep the n electrodes with the highest std
-    :param dfc: dataframe to filter
-    :param n: number of electrodes to keep
-    :return: filtered dataframe
+        top_N_electrodes(df, n, except_column):
+
+            Select only the n electrodes with the highest standard
+            deviation, symbolizing the highest activity.
+
+            Parameters
+            ----------
+            df: Dataframe
+                Contains the data. If using MEA it has the following
+                formatting: the first column contains the time dimension,
+                names 'TimeStamp [µs]', while each other represent the
+                different electrodes of the MEA, with names going as
+                '48 (ID=1) [pV]' or similar.
+            n: int
+                the number of channels to keep, sorted by the highest
+                standard deviation.
+            except_column: str, optional, default: 'TimeStamp [µs]'
+                The name of a column to exclude of the selection.
+                This column will be included in the resulting
+                dataframe.
+
+            Returns
+            -------
+            out: pandas Dataframe
+                Dataframe containing only n columns, corresponding
+                to the n channels with the highest standard deviation.
+                If except_column exists, then this very column is added
+                untouched from the original dataframe to the resulting
+                one.
+
+            Notes
+            -----
+            This function only use the standard deviation as metric to
+            use to sort the channels. Any modification on this metric
+            should be done on the line indicated below.
+
+            Examples
+            --------
+            >> df = pd.read_csv(file)
+            >> df_top = dpr.top_N_electrodes(df=df, n=35, except_column='TimaStamp [µs]")
+            Returns a dataframe containing the top 35 channels based on the std of the signal
+
     """
-    for col in df.columns:
-        if except_column in col:
-            except_column = col
+    # getting the complete name of the column to exclude, in case of slight fluctuation in names
+    if except_column:
+        for col in df.columns:
+            if except_column in col:
+                except_column = col
+
+    # managing 'except_column'
     dfc = df.drop(except_column, axis=1)
     df_filtered = pd.DataFrame()
     df_filtered[except_column] = df[except_column]
 
-    all_std = []
+    # getting the top channels by metric. Metric changes should be done here.
+    all_metric = []
     for c in dfc.columns:
-        all_std.append(np.std(dfc[c]))
-    top_indices = sorted(range(len(all_std)), key=lambda i: all_std[i], reverse=True)[:n]
+        all_metric.append(np.std(dfc[c]))
+    top_indices = sorted(range(len(all_metric)), key=lambda i: all_metric[i], reverse=True)[:n]
 
+    # creating resulting dataframe
     for c in dfc.columns:
         id = c.split(")")[0].split("=")[1]
         if int(id) in top_indices:

@@ -28,101 +28,6 @@ import data_processing as dp
 from firelib.firelib import firefiles as ff
 
 
-
-
-def features_importance_std_spikes3_randlabel_n_iterations(model_paths, save=False, title="", stacked=True):
-    stds = []
-    spikes = []
-    randoms = []
-    times = ["T=0", "T=30MIN", "T=24H"]
-    std = []
-    for model_path in model_paths:
-        record_time = model_path.split("\\")[2].split("_")[4]
-        model = ml.load_model(model_path)
-        importances = model.feature_importances_
-        std.append(np.std([tree.feature_importances_ for tree in model.estimators_], axis=0))
-
-        forest_importances = pd.Series(importances, index=range(0, 3))
-        stds.append(forest_importances[0])
-        spikes.append(forest_importances[1])
-        randoms.append(forest_importances[2])
-    print(std)
-
-    stds_std = []
-    for s in std:
-        stds_std.append(s[0])
-    spikes_std = []
-    for s in std:
-        spikes_std.append(s[1])
-    randoms_std = []
-    for s in std:
-        randoms_std.append(s[2])
-    bot = [x + y for x, y in zip(spikes, randoms)]
-
-    if stacked:
-        plt.bar(times, stds, bottom=bot, color="lightgray", label="std", yerr=np.mean(stds_std))
-        plt.bar(times, spikes, color="darkgray", bottom=randoms, label="spikes count t=3", yerr=np.mean(spikes_std))
-        plt.bar(times, randoms, color="dimgray", label="random feature", yerr=np.mean(randoms_std))
-    else:
-        plt.bar(times, stds, color="lightgray", label="std", yerr=np.mean(stds_std))
-        plt.bar(times, spikes, color="darkgray", label="spikes count t=3", yerr=np.mean(spikes_std))
-        plt.bar(times, randoms, color="dimgray", label="random feature", yerr=np.mean(randoms_std))
-
-    if stacked:
-        title = title + " stacked"
-    plt.title(title)
-    plt.legend(bbox_to_anchor=(0.5, 1.0), loc='upper left')
-    if save:
-        plt.savefig("Four organoids\\figures\\" + title)
-    else:
-        plt.show()
-
-    # forest_importances.plot.bar(ax=ax)
-    # ax.set_title("Feature importances using MDI - " + str(path.split("\\")[-2]))
-    # ax.set_ylabel("Mean decrease in impurity")
-    # plt.tight_layout()
-    # plt.savefig("figures/features_importance_std_spikes3_randlabel")
-
-
-def features_importance_std_spikes3_randlabel(save=False, title=""):
-    model_paths = ["Two organoids/ml_models/std_range_spikes_min3_max3_step1_top35_t=0_randLabel_True/rfc1000.sav",
-                   "Two organoids/ml_models/std_range_spikes_min3_max3_step1_top35_t=30 min_randLabel_True/rfc1000.sav",
-                   "Two organoids/ml_models/std_range_spikes_min3_max3_step1_top35_t=24 h_randLabel_True/rfc1000.sav", ]
-
-    stds = []
-    spikes = []
-    randoms = []
-    times = ["t=0", "t=30 min", "t=24 h"]
-    for model_path in model_paths:
-        record_time = model_path.split("/")[2].split("_")[7]
-        model = ml.load_model(model_path)
-        importances = model.feature_importances_
-        std = np.std([tree.feature_importances_ for tree in model.estimators_], axis=0)
-
-        forest_importances = pd.Series(importances, index=range(0, 3))
-        stds.append(forest_importances[0])
-        spikes.append(forest_importances[1])
-        randoms.append(forest_importances[2])
-
-    bot = [x + y for x, y in zip(spikes, randoms)]
-    plt.bar(times, stds, bottom=bot, color="silver", label="std")
-    plt.bar(times, spikes, color="gray", bottom=randoms, label="spikes count t=3")
-    plt.bar(times, randoms, color="black", label="random feature")
-
-    plt.title(title)
-    plt.legend(bbox_to_anchor=(0.5, 1.0), loc='upper left')
-    if save:
-        plt.savefig("figures/" + title)
-    else:
-        plt.show()
-
-    # forest_importances.plot.bar(ax=ax)
-    # ax.set_title("Feature importances using MDI - " + str(path.split("\\")[-2]))
-    # ax.set_ylabel("Mean decrease in impurity")
-    # plt.tight_layout()
-    # plt.savefig("figures/features_importance_std_spikes3_randlabel")
-
-
 def frequencies_cov_ni_separated_organoids(mono_time):
     fig, ax = plt.subplots()
 
@@ -153,7 +58,7 @@ def frequencies_cov_ni_separated_organoids(mono_time):
                 df = pd.read_csv(p)
                 # selecting top channels by their std
 
-                df_top = dpr.top_N_electrodes(df, top_n, "TimeStamp")
+                df_top = dpr.top_n_electrodes(df, top_n, "TimeStamp")
 
                 samples = dpr.equal_samples(df_top, truncate)
                 channels = df_top.columns
@@ -202,7 +107,7 @@ def frequencies_cov_ni(mono_time):
                 df = pd.read_csv(p)
                 # selecting top channels by their std
 
-                df_top = dpr.top_N_electrodes(df, top_n, "TimeStamp")
+                df_top = dpr.top_n_electrodes(df, top_n, "TimeStamp")
 
                 samples = dpr.equal_samples(df_top, truncate)
                 channels = df_top.columns
@@ -511,87 +416,3 @@ def inf_ni_frequency_pattern_ROI_bar(mono_time="T=24H", process=False, ds=False)
         plt.savefig(f"Four organoids\\figures\\filtered frequencies for {mono_time}")
     plt.show()
 
-
-def inf_ni_frequency_pattern(mono_time="T=24H", process=False, ds=False, zoom_in=False):
-    dsd = ""
-    if ds:
-        dsd = "DS"
-    if process:
-        path = f"Four organoids/datasets/{dsd}filtered_50_frequencies_per_organoid_repeats_{mono_time}.csv"
-        df = pd.read_csv(path)
-        repeated_organoids = {"INF1": [], "INF2": [], "INF3": [], "INF4": [],
-                              "NI1": [], "NI2": [], "NI3": [], "NI4": []}
-        for col in df.columns[1:]:
-            status = col.split("_")[0]
-            repeated_organoids[status].append(df[col])
-        organoids = {"INF1": [], "INF2": [], "INF3": [], "INF4": [],
-                     "NI1": [], "NI2": [], "NI3": [], "NI4": []}
-        for key in repeated_organoids:
-            arrays = [np.array(x) for x in repeated_organoids[key]]
-            organoids[key] = [np.mean(k) for k in zip(*arrays)]
-
-        title = f"Four organoids/datasets/{dsd}filtered_50_frequencies_per_organoid_{mono_time}.csv"
-        frequencies_df = pd.DataFrame()
-
-        for key in organoids:
-            frequencies_df[key] = organoids[key]
-        frequencies_df.to_csv(title, index=False)
-
-    freq_df = pd.read_csv(f"Four organoids/datasets/{dsd}filtered_50_frequencies_per_organoid_{mono_time}.csv")
-    mean_inf = dpr.merge_all_columns_to_mean(freq_df[["INF1", "INF2", "INF3", "INF4"]])
-    mean_ni = dpr.merge_all_columns_to_mean(freq_df[["NI1", "NI2", "NI3", "NI4"]])
-    std_inf = []
-    std_ni = []
-    for ind in freq_df.index:
-        std_inf.append(np.std([freq_df["INF1"].iloc[[ind]], freq_df["INF2"].iloc[[ind]],
-                               freq_df["INF3"].iloc[[ind]], freq_df["INF4"].iloc[[ind]]]))
-        std_ni.append(np.std([freq_df["NI1"].iloc[[ind]], freq_df["NI2"].iloc[[ind]],
-                              freq_df["NI3"].iloc[[ind]], freq_df["NI4"].iloc[[ind]]]))
-
-    length = [x for x in range(len(mean_inf))]
-    std_inf_low = [mean_inf["mean"][x] - std_inf[x] for x in length]
-    std_inf_high = [mean_inf["mean"][x] + std_inf[x] for x in length]
-    std_ni_low = [mean_ni["mean"][x] - std_ni[x] for x in length]
-    std_ni_high = [mean_ni["mean"][x] + std_ni[x] for x in length]
-
-    plt.plot(mean_inf, label="mean inf", color="red")
-    plt.fill_between(length, y1=std_inf_high, y2=std_inf_low, alpha=.4, color="red",
-                     label="std inf across organoids")
-
-    plt.plot(mean_ni, label="mean ni", color="blue")
-    plt.fill_between(length, y1=std_ni_high, y2=std_ni_low, alpha=0.4, color="blue",
-                     label="std ni across organoids")
-    if zoom_in:
-        if ds:
-            ratio = 5000 / 300
-            x_ds = [x for x in range(0, 301, 15)]
-            x_freq = [int(x * ratio) for x in x_ds]
-            plt.xticks(x_ds, x_freq, rotation=45)
-            plt.xlabel("frequencies (50-5000 Hz) as features (0-300)")
-            plt.ylabel("spectral power")
-            data = pd.DataFrame()
-            data["mean inf spectral power"] = mean_inf
-            data["std inf spectral power"] = std_inf
-            data["mean ni spectral power"] = mean_ni
-            data["std ni spectral power"] = std_ni
-            data.to_csv(r"Four organoids/datasets/down_sampled_frequencies_across_inf_ni_organoids.csv", index=False)
-        else:
-            ratio = 5000 / 300000
-            x_ds = [x for x in range(0, 300001, 10000)]
-            x_freq = [int(x * ratio) for x in x_ds]
-            plt.xticks(x_ds, x_freq, rotation=45)
-            plt.xlabel("frequencies (50-5000 Hz)")
-            plt.ylabel("spectral power")
-            data = pd.DataFrame()
-            data["mean inf spectral power"] = mean_inf
-            data["std inf spectral power"] = std_inf
-            data["mean ni spectral power"] = mean_ni
-            data["std ni spectral power"] = std_ni
-            data.to_csv(r"Four organoids/datasets/original_frequencies_across_inf_ni_organoids.csv", index=False)
-
-    plt.legend()
-    if ds:
-        plt.savefig(f"Four organoids\\figures\\{dsd} filtered frequencies for {mono_time}")
-    else:
-        plt.savefig(f"Four organoids\\figures\\filtered frequencies for {mono_time}")
-    plt.show()

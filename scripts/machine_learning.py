@@ -21,15 +21,36 @@ import PATHS as P
 import sys
 
 
-def train_model_from_dataset(dataset, model_save_path="", save=False, scores=True):
+def train_model_from_dataset(dataset, save_filename="", save=False, scores=True):
     """
-    Train an RFC model from a dataset and save the model.
+    train_model_from_dataset(dataset, model_save_path="", save=False, scores=True):
 
-    :param dataset: The dataset to train the model.
-    :param model_save_path: Path to save the model
-    :return: the trained RFC model
+        Train a Random Forest Classifier model from an already formatted dataset.
+
+        Parameters
+        ----------
+        dataset : pandas Dataframe
+            a pandas Dataframe where each row is an entry for a machine
+            learning model. Has a last column as 'target' containing
+            the target value for each entry.
+
+        save_filename: str, optional, default:''
+            name of the saved file. Used if save is True.
+
+        save: bool, optional, default: False
+            Whether to save the resulting modl as a file of not.
+
+        scores: bool, optional, default: False
+            Whether to return the clf.score(X_test, y_test) sklearn
+            metric or not.
+
+            .. versionadded:: 1.0.0
+
+        Returns
+        -------
+        out : RandomForestClassifier
+            a trained random forest classifier. An attribute clf.feature_names has been added.
     """
-    # todo : documentation
 
     clf = RandomForestClassifier(n_estimators=1000)
     X = dataset[dataset.columns[:-1]]
@@ -40,7 +61,7 @@ def train_model_from_dataset(dataset, model_save_path="", save=False, scores=Tru
         print(clf.score(X_test, y_test))
     clf.feature_names = [x for x in X.columns]
     if save:
-        pickle.dump(clf, open(model_save_path, "wb"))
+        pickle.dump(clf, open(os.path.join(P.MODELS, save_filename), "wb"))
     return clf
 
 
@@ -124,12 +145,35 @@ def get_feature_of_interest(timepoint, path, detection_factor=2.0, plot=True, by
 
 def get_features_of_interest_from_trained_model(clf, percentage=0.05, show=False, save=False, title=""):
     """
-    Only for model not trained on restricted features.
+        get_features_of_interest_from_trained_model(clf, percentage=0.05, show=False, save=False, title=""):
 
-    :param clf:
-    :param percentage:
-    :return:
-    """
+            select to top n% feature sorted by highest importance, of a trained Random Forest Classtifier model.
+
+            Parameters
+            ----------
+            clf : RandomForestClassifier
+                a trained model
+
+            percentage: float, optional, default: 0.05
+                proportion of the most important features to keep
+
+            show: bool, optional, default: False
+                Whether to show a plot of the model feature importance or not.
+
+            save: bool, optional, default: False
+                Whether to save a plot of the model feature importance or not.
+
+            title: str, optional, default: ''
+                the title to give the plot and name of the resulting file if save if True.
+
+                .. versionadded:: 1.0.0
+
+            Returns
+            -------
+            out : tuple of lists
+                first element: list of the indexes of the most important features
+                second element: importance (values) corresponding to the indexes.
+        """
     importances_over_iterations = []
     std_over_iterations = []
     for i in range(10):
@@ -164,25 +208,39 @@ def get_features_of_interest_from_trained_model(clf, percentage=0.05, show=False
     xticks.append(300)
     new_ticks.append(5000)
     plt.xticks(xticks, new_ticks)
+    plt.ylabel("Relative importance [AU]")
+    plt.xlabel("Frequency-like features [Hz]")
     plt.title(title)
     if save:
         plt.savefig(os.path.join(P.RESULTS, title + ".png"))
     # plt.fill_between(hertz, low_std, high_std, facecolor="blue", alpha=0.5)
     if show:
         plt.show()
-    return idx_foi
+    plt.close()
+    return idx_foi, mean_importances_over_iterations
 
 
-def test_model(clf, dataset, verbose=False, show=True, training_targets=(),
-               testing_targets=(),
-               save=False, commentary=""):
+def test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, commentary=""):
     """
-    Test a model on a dataset.
+        test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, commentary=""):
 
-    :param clf: The model
-    :param dataset: dataset used for the testing
-    :param iterations: number of iteration for testing
-    :return: scores
+            Test an already trained Random forest classifier model,
+            resulting in a confusion matrix. The test can be done
+            on targets different from the targets used for training
+            the model.
+
+            Parameters
+            ----------
+            clf: RandomForestClassifier
+                the trained model.
+            dataset:  pandas Dataframe.
+                Dataframe containing the data used for testing the
+                model. The rows are the entries, and the columns are
+                the features on which the model has been trained.
+                The last column is 'status' containing the labels
+                of the targets for each entry.
+            training_targets: tuple of str
+
     """
     # todo: make testing over iterations
     if not testing_targets:
@@ -199,7 +257,7 @@ def test_model(clf, dataset, verbose=False, show=True, training_targets=(),
             CORRESPONDANCE[t] = target_id
             target_id += 1
             
-
+    print(CORRESPONDANCE)
     X = dataset[dataset.columns[:-1]]
     y = dataset["status"]
 
@@ -212,7 +270,7 @@ def test_model(clf, dataset, verbose=False, show=True, training_targets=(),
 
     # get predictions and probabilities
 
-    title = f"train {training_targets}-test {testing_targets}"
+    title = f"train {training_targets}-test {testing_targets} {commentary}"
     matrix = np.zeros((len(training_targets), len(testing_targets)))
     probabilities_matrix = np.empty((len(training_targets), len(testing_targets)), dtype=object)
     mixed_labels_matrix = np.empty((len(training_targets), len(testing_targets))).tolist()
@@ -235,15 +293,12 @@ def test_model(clf, dataset, verbose=False, show=True, training_targets=(),
     targets = []
     for i in y_test.index:
         targets.append(y_test.loc[i])
-
     # Building the confusion matrix
     for i in range(len(targets)):
         y_true = targets[i]
         y_pred = predictions[i][0]
         y_proba = max(predictions[i][1])
-        matrix[CORRESPONDANCE[y_pred]][CORRESPONDANCE[y_true]] += 1 # todo: attention, si on a que 2 targets dont +RG27, on prend des valeurs
-        # todo: y_pred/true à 2 ou 3, ce qui est superieur aux dimensions de la matrice
-        # todo:
+        matrix[CORRESPONDANCE[y_pred]][CORRESPONDANCE[y_true]] += 1
 
         probabilities_matrix[CORRESPONDANCE[y_pred]][CORRESPONDANCE[y_true]].append(y_proba)
     # averaging the probabilities
@@ -276,5 +331,6 @@ def test_model(clf, dataset, verbose=False, show=True, training_targets=(),
         plt.savefig(os.path.join(P.RESULTS, "Confusion matrix-" + title + ".png"))
     if show:
         plt.show()
+
 
     # all_metrics.append(((positive_class, negative_class), (tp, tn, fp, fn)))

@@ -33,14 +33,14 @@ def generate_stachel_dataset():
     for f in freq_files:
         print(f)
         df = pd.read_csv(f)
-        df_top = dpr.top_N_electrodes(df, 35, "Frequency [Hz]")
+        df_top = dpr.top_n_electrodes(df, 35, "Frequency [Hz]")
         samples = dpr.equal_samples(df_top, 30)
 
         for df_s in samples:
 
             df_mean = dpr.merge_all_columns_to_mean(df_s, "Frequency [Hz]").round(3)
 
-            downsampled_df = dpr.down_sample(df_mean["mean"], 300, 'mean')
+            downsampled_df = dpr.smoothing(df_mean["mean"], 300, 'mean')
 
             # construct the dataset with n features
             dataset.loc[len(dataset)] = downsampled_df
@@ -70,7 +70,7 @@ def generate_basic_dataset():
     for f in pr_paths:
         print(f)
         df = pd.read_csv(f)
-        df_top = dpr.top_N_electrodes(df, 35, "TimeStamp")
+        df_top = dpr.top_n_electrodes(df, 35, "TimeStamp")
         samples = dpr.equal_samples(df_top, 30)
         channels = df_top.columns
 
@@ -87,7 +87,7 @@ def generate_basic_dataset():
             df_mean = dpr.merge_all_columns_to_mean(fft_all_channels, "Frequency [Hz]").round(3)
 
             # Down sampling by n
-            downsampled_df = dpr.down_sample(df_mean["mean"], 300, 'mean')
+            downsampled_df = dpr.smoothing(df_mean["mean"], 300, 'mean')
 
             # construct the dataset with n features
             dataset.loc[len(dataset)] = downsampled_df
