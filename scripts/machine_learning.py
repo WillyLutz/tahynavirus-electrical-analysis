@@ -19,6 +19,8 @@ import data_analysis as dan
 from firelib.firelib import firefiles as ff
 import PATHS as P
 import sys
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 
 
 def train_model_from_dataset(dataset, save_filename="", save=False, scores=True):
@@ -226,7 +228,7 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
 
             Test an already trained Random forest classifier model,
             resulting in a confusion matrix. The test can be done
-            on targets different from the targets used for training
+            on targets_labels different from the targets_labels used for training
             the model.
 
             Parameters
@@ -238,7 +240,7 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
                 model. The rows are the entries, and the columns are
                 the features on which the model has been trained.
                 The last column is 'status' containing the labels
-                of the targets for each entry.
+                of the targets_labels for each entry.
             training_targets: tuple of str
 
     """
@@ -334,3 +336,83 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
 
 
     # all_metrics.append(((positive_class, negative_class), (tp, tn, fp, fn)))
+
+def principal_component_analysis(targets, n_components, save=False, show=True, record="T=48H"):
+    """
+    principal_component_analysis(targets, n_components, save=False, show=True, record="T=48H"):
+
+        Do a principal component analysis given specified targets.
+
+        Parameters
+        ----------
+        targets: iterable of str
+            Name of the targets_labels we want to classify on. They must be written
+            in the path as the grand-grand-parent of the frequency file.
+        n_components: int
+            number of components for the PCA.
+        save: bool, optional, default: False
+            Whether to save the plot or not.
+        show: bool, optional, default: True
+            Whether to show the plot or not. Only available with n_component at
+            2 or 3.
+        record: str, optional, default: "T=48H"
+            recording time point, where we look for our data.
+
+        Returns
+        -------
+        out: tuple.
+            First element is a DataFrame, containing the different principal
+            components and their label. The second element is a list of float
+            containing the PCA explained variance ratios.
+    """
+    tahynavirus_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=targets,
+                                                           to_include=("freq_50hz_sample", record,),
+                                                           to_exclude=("TTX",),
+                                                           verbose=False, save=False, )
+    features = tahynavirus_dataset.columns[:-1]
+    x = tahynavirus_dataset.loc[:, features].values
+    x = StandardScaler().fit_transform(x)  # normalizing the features
+    pca_tahynavirus = PCA(n_components=n_components)
+    principalComponent_tahyna = pca_tahynavirus.fit_transform(x)
+    principal_component_columns = [f"principal component {i+1}" for i in range(n_components)]
+
+    principal_tahyna_Df = pd.DataFrame(data=principalComponent_tahyna
+                                       , columns=principal_component_columns)
+    pca_ratios = pca_tahynavirus.explained_variance_ratio_
+    if show or save:
+        if n_components == 2:
+            plt.figure(figsize=(10, 10))
+            plt.xticks(fontsize=12)
+            plt.yticks(fontsize=14)
+            plt.xlabel(f'Principal Component - 1 ({round(pca_ratios[0] * 100, 1)}%)', fontsize=20)
+            plt.ylabel(f'Principal Component - 2 ({round(pca_ratios[1] * 100, 1)}%)', fontsize=20)
+            plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
+            colors = ['r', 'g', 'b', 'k']
+            for target, color in zip(targets, colors):
+                indicesToKeep = tahynavirus_dataset['status'] == target
+                plt.scatter(principal_tahyna_Df.loc[indicesToKeep, 'principal component 1']
+                            , principal_tahyna_Df.loc[indicesToKeep, 'principal component 2'], c=color, s=10)
+            plt.legend(targets, prop={'size': 15})
+        elif n_components == 3:
+            plt.figure(figsize=(10, 10))
+            ax = plt.axes(projection='3d')
+            ax.set_xlabel(f'Principal Component - 1 ({round(pca_ratios[0] * 100, 1)}%)', fontsize=20)
+            ax.set_ylabel(f'Principal Component - 2 ({round(pca_ratios[1] * 100, 1)}%)', fontsize=20)
+            ax.set_zlabel(f'Principal Component - 3 ({round(pca_ratios[2] * 100, 1)}%)', fontsize=20)
+            colors = ['r', 'g', 'b', 'k']
+            plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
+            for target, color in zip(targets, colors):
+                indicesToKeep = tahynavirus_dataset['label'] == target
+                x = principal_tahyna_Df.loc[indicesToKeep, 'principal component 1']
+                y = principal_tahyna_Df.loc[indicesToKeep, 'principal component 2']
+                z = principal_tahyna_Df.loc[indicesToKeep, 'principal component 3']
+                ax.scatter3D(x, y, z, c=color, s=10)
+            plt.legend(targets, prop={'size': 15})
+    if save:
+        plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets} r={record}.png"))
+    if show:
+        plt.show()
+    plt.close()
+
+    principal_tahyna_Df["label"] = tahynavirus_dataset["label"]
+    return principal_tahyna_Df, pca_ratios

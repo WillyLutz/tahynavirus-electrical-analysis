@@ -157,20 +157,20 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=()
         plt.show()
     return ax
 
-def make_dataset_from_freq_files(parent_directories, targets, to_include, to_exclude=(), save=False, verbose=False, commentary="",):
+def make_dataset_from_freq_files(parent_directories, targets_labels, to_include, to_exclude=(), save=False, verbose=False, commentary="", ):
     """
-    make_dataset_from_freq_files(parent_directories, commentary="", targets=(), to_include=(), to_exclude=(), save=False, verbose=False)
+    make_dataset_from_freq_files(parent_directories, commentary="", targets_labels=(), to_include=(), to_exclude=(), save=False, verbose=False)
 
         Return a pandas Dataframe where each row is an entry for a machine lerning model. Use frequency files and smoothen
         them down to 300 values used as features.
 
         Parameters
         ----------
-        parent_directories : tuple of str
+        parent_directories : tuple or list
             System paths from where the searching for frequency files will r
             ecursively occur
-        targets : tuple of str
-            Name of the targets we want to classify on. They must be written
+        targets_labels : tuple of str
+            Name of the targets_labels we want to classify on. They must be written
             in the path as the grand-grand-parent of the frequency file.
         to_include : tuple of str
             Allow to select children paths of parent_directories. All the
@@ -197,18 +197,17 @@ def make_dataset_from_freq_files(parent_directories, targets, to_include, to_exc
             original path of the file where it came from.
 
     """
-
     freq_files = []
     for parent_dir in parent_directories:
         files = ff.get_all_files(os.path.join(parent_dir))
 
         for f in files:
             if all(i in f for i in to_include) and (not any(e in f for e in to_exclude)):
-                if os.path.basename(Path(f).parent.parent) in targets:
+                if os.path.basename(Path(f).parent.parent) in targets_labels:
                     freq_files.append(f)
     columns = list(range(0, 300))
     dataset = pd.DataFrame(columns=columns)
-    target = pd.DataFrame(columns=["status", ])
+    targets_df = pd.DataFrame(columns=["label", ])
     title = commentary + ""
 
     n_processed_files = 0
@@ -217,14 +216,15 @@ def make_dataset_from_freq_files(parent_directories, targets, to_include, to_exc
         df = pd.read_csv(f)
         downsampled_df = smoothing(df["mean"], 300, 'mean')
         dataset.loc[len(dataset)] = downsampled_df
-        target.loc[len(target)] = os.path.basename(Path(f).parent.parent)
+        target = os.path.basename(Path(f).parent.parent)
+        targets_df.loc[len(targets_df)] = target
 
         if verbose:
             progress = int(np.ceil(n_processed_files / len(freq_files) * 100))
             sys.stdout.write(f"\rProgression of processing files: {progress}%")
             sys.stdout.flush()
             n_processed_files += 1
-    dataset["status"] = target["status"]
+    dataset["label"] = targets_df["label"]
     if verbose:
         print("\n")
     if save:
