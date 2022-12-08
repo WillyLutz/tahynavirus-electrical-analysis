@@ -39,7 +39,7 @@ def make_highest_features_dataset_from_complete_dataset(foi, df, percentage=0.05
     df_foi["status"] = df["status"]
     if save:
         df_foi.to_csv(os.path.join(os.path.dirname(df), f"highest {percentage * 100}% features - "
-                                                                      f"{os.path.basename(df)}"),
+                                                        f"{os.path.basename(df)}"),
                       index=False)
     return df_foi
 
@@ -157,7 +157,9 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=()
         plt.show()
     return ax
 
-def make_dataset_from_freq_files(parent_directories, targets_labels, to_include, to_exclude=(), save=False, verbose=False, commentary="", ):
+
+def make_dataset_from_freq_files(parent_directories, targets_labels, to_include, to_exclude=(), save=False,
+                                 verbose=False, commentary="", ):
     """
     make_dataset_from_freq_files(parent_directories, commentary="", targets_labels=(), to_include=(), to_exclude=(), save=False, verbose=False)
 
@@ -228,7 +230,7 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
     if verbose:
         print("\n")
     if save:
-        dataset.to_csv(os.path.join(P.DATASETS, title+".csv"), index=False)
+        dataset.to_csv(os.path.join(P.DATASETS, title + ".csv"), index=False)
     return dataset
 
 

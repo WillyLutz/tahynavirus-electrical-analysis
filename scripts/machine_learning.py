@@ -1,29 +1,20 @@
 import os
 import pickle
-import time
-
-import forestci
-import numpy as np
-import sklearn
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn import svm, linear_model
-from sklearn.linear_model import LogisticRegression, SGDClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score
-import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
-import data_processing as dpr
-import data_analysis as dan
-from firelib.firelib import firefiles as ff
-import PATHS as P
 import sys
-from sklearn.preprocessing import StandardScaler
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+import seaborn as sns
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+
+import PATHS as P
 
 
-def train_model_from_dataset(dataset, save_filename="", save=False, scores=True):
+def train_RFC_from_dataset(dataset, save_filename=""):
     """
     train_model_from_dataset(dataset, model_save_path="", save=False, scores=True):
 
@@ -37,10 +28,7 @@ def train_model_from_dataset(dataset, save_filename="", save=False, scores=True)
             the target value for each entry.
 
         save_filename: str, optional, default:''
-            name of the saved file. Used if save is True.
-
-        save: bool, optional, default: False
-            Whether to save the resulting modl as a file of not.
+            name of the saved file. If empty, does not save the file.
 
         scores: bool, optional, default: False
             Whether to return the clf.score(X_test, y_test) sklearn
@@ -51,101 +39,20 @@ def train_model_from_dataset(dataset, save_filename="", save=False, scores=True)
         Returns
         -------
         out : RandomForestClassifier
-            a trained random forest classifier. An attribute clf.feature_names has been added.
+            a trained random forest classifier.
     """
 
     clf = RandomForestClassifier(n_estimators=1000)
     X = dataset[dataset.columns[:-1]]
-    y = dataset["status"]
+    y = dataset["label"]
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5)
     clf.fit(X_train, y_train)
-    if scores:
-        print(clf.score(X_test, y_test))
-    clf.feature_names = [x for x in X.columns]
-    if save:
+    if save_filename:
         pickle.dump(clf, open(os.path.join(P.MODELS, save_filename), "wb"))
-    return clf
+    return clf, clf.score(X_test, y_test)
 
 
-def get_feature_of_interest(timepoint, path, detection_factor=2.0, plot=True, by_percentage=False, percentage=0.05):
-    dataset = pd.read_csv(path)
-    # training
-    print("learning")
-    X = dataset[dataset.columns[:-1]]
-    y = dataset["status"]
-
-    model_directory = P.MODELS
-    ff.verify_dir(model_directory)
-    importances_over_iterations = []
-    std_over_iterations = []
-    for i in range(10):
-        clf = RandomForestClassifier(n_estimators=1000)
-        clf.fit(X, y)
-        mean = np.mean([tree.feature_importances_ for tree in clf.estimators_], axis=0)
-
-        importances_over_iterations.append(mean)
-
-    arrays = [np.array(x) for x in importances_over_iterations]
-    mean_importances_over_iterations = [np.mean(k) for k in zip(*arrays)]
-    std_arrays = [np.array(x) for x in importances_over_iterations]
-    std_importances_over_iterations = [np.std(k) for k in zip(*std_arrays)]
-
-    low_std = []
-    for i in range(len(mean_importances_over_iterations)):
-        low_std.append(mean_importances_over_iterations[i] - std_importances_over_iterations[i])
-    high_std = []
-    for i in range(len(mean_importances_over_iterations)):
-        high_std.append(mean_importances_over_iterations[i] + std_importances_over_iterations[i])
-
-    hertz = []
-    factor = 5000 / 300
-    for i in range(300):
-        hertz.append(int(i * factor))
-
-    whole_mean = np.mean(mean_importances_over_iterations)
-    whole_std = np.std(mean_importances_over_iterations)
-
-    high_mean_thresh = whole_mean + whole_std * detection_factor
-    low_mean_thresh = whole_mean - whole_mean
-    factor_mean_thresh = 1
-    if plot:
-        fig, ax = plt.subplots()
-        ax.plot(hertz, mean_importances_over_iterations, color="red", linewidth=0.5)
-        ax.fill_between(hertz, low_std, high_std, facecolor="blue", alpha=0.5)
-
-        ax.axhline(y=whole_mean, xmin=0, xmax=300, color="black", linewidth=0.5)
-        ax.fill_between(hertz, low_mean_thresh * factor_mean_thresh, high_mean_thresh * factor_mean_thresh,
-                        facecolor="black", alpha=0.3)
-
-        idx = []
-        for i in range(len(mean_importances_over_iterations) - 1):
-            value1 = mean_importances_over_iterations[i]
-            value2 = mean_importances_over_iterations[i + 1]
-
-            if value1 >= high_mean_thresh * factor_mean_thresh >= value2 or value1 <= high_mean_thresh * factor_mean_thresh <= value2:
-                idx.append(hertz[i])
-
-        for x in idx:
-            ax.axvline(x=x, color="green", linewidth=0.5)
-
-        title = f"features of interest at {timepoint} with {detection_factor} factor detection"
-        plt.show()
-
-    if by_percentage:
-        n = int(percentage * len(mean_importances_over_iterations))
-        idx_foi = sorted(range(len(mean_importances_over_iterations)),
-                         key=lambda i: mean_importances_over_iterations[i], reverse=True)[:n]
-        return idx_foi
-    else:
-        idx_foi = []
-        for i in range(len(mean_importances_over_iterations) - 1):
-            if mean_importances_over_iterations[i] >= high_mean_thresh * factor_mean_thresh:
-                idx_foi.append(i)
-
-        return idx_foi
-
-
-def get_features_of_interest_from_trained_model(clf, percentage=0.05, show=False, save=False, title=""):
+def get_top_features_from_trained_model(clf, percentage=0.05, show=False, save=False, title=""):
     """
         get_features_of_interest_from_trained_model(clf, percentage=0.05, show=False, save=False, title=""):
 
@@ -247,7 +154,7 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
     # todo: make testing over iterations
     if not testing_targets:
         testing_targets = training_targets
-        
+
     CORRESPONDANCE = {}
     target_id = 0
     for t in training_targets:
@@ -258,7 +165,7 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
         if t not in CORRESPONDANCE:
             CORRESPONDANCE[t] = target_id
             target_id += 1
-            
+
     print(CORRESPONDANCE)
     X = dataset[dataset.columns[:-1]]
     y = dataset["status"]
@@ -317,7 +224,7 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
                 round(mean_probabilities_matrix[i][j], 3))
 
     # plotting
-    fig, ax = plt.subplots(1, 1, figsize=(7/4*len(testing_targets), 6/4*len(training_targets)))
+    fig, ax = plt.subplots(1, 1, figsize=(7 / 4 * len(testing_targets), 6 / 4 * len(training_targets)))
 
     fig.suptitle("")
     sns.heatmap(ax=ax, data=matrix, annot=mixed_labels_matrix, fmt='')
@@ -334,85 +241,129 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
     if show:
         plt.show()
 
-
     # all_metrics.append(((positive_class, negative_class), (tp, tn, fp, fn)))
 
-def principal_component_analysis(targets, n_components, save=False, show=True, record="T=48H"):
-    """
-    principal_component_analysis(targets, n_components, save=False, show=True, record="T=48H"):
 
-        Do a principal component analysis given specified targets.
+def fit_pca(dataframe, n_components=3):
+    """
+    fit_pcs(dataframe, n_components):
+
+        fit a Principal Component Analysis and return its instance and dataset.
 
         Parameters
         ----------
-        targets: iterable of str
-            Name of the targets_labels we want to classify on. They must be written
-            in the path as the grand-grand-parent of the frequency file.
-        n_components: int
-            number of components for the PCA.
-        save: bool, optional, default: False
-            Whether to save the plot or not.
-        show: bool, optional, default: True
-            Whether to show the plot or not. Only available with n_component at
-            2 or 3.
-        record: str, optional, default: "T=48H"
-            recording time point, where we look for our data.
+        dataframe: DataFrame
+            The data on which the pca instance has to be fitted.
+        n_components: int, optional, default: 3
+            The number of components for the PCA instance.
 
         Returns
         -------
-        out: tuple.
-            First element is a DataFrame, containing the different principal
-            components and their label. The second element is a list of float
-            containing the PCA explained variance ratios.
+        out: tuple
+            The first element is the PCA instance. The second
+            element is the resulting dataframe.
     """
-    tahynavirus_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=targets,
-                                                           to_include=("freq_50hz_sample", record,),
-                                                           to_exclude=("TTX",),
-                                                           verbose=False, save=False, )
-    features = tahynavirus_dataset.columns[:-1]
-    x = tahynavirus_dataset.loc[:, features].values
+    features = dataframe.columns[:-1]
+    x = dataframe.loc[:, features].values
     x = StandardScaler().fit_transform(x)  # normalizing the features
-    pca_tahynavirus = PCA(n_components=n_components)
-    principalComponent_tahyna = pca_tahynavirus.fit_transform(x)
-    principal_component_columns = [f"principal component {i+1}" for i in range(n_components)]
+    pca = PCA(n_components=n_components)
+    principalComponent = pca.fit_transform(x)
+    principal_component_columns = [f"principal component {i + 1}" for i in range(n_components)]
 
-    principal_tahyna_Df = pd.DataFrame(data=principalComponent_tahyna
+    principal_tahyna_Df = pd.DataFrame(data=principalComponent
                                        , columns=principal_component_columns)
-    pca_ratios = pca_tahynavirus.explained_variance_ratio_
+
+    principal_tahyna_Df["label"] = dataframe["label"]
+
+    return pca, principal_tahyna_Df, pca.explained_variance_ratio_
+
+
+def apply_pca(pca: PCA, dataframe):
+    """
+    apply_pca(pca, dataframe):
+
+        Transform data using an already fit PCA instance.
+
+        Parameters
+        ----------
+        pca: PCA instance
+            The fitted PCA instance from what the data will
+            be transformed.
+        dataframe: DataFrame
+            The data to transform using an already fitted PCA.
+            Must have a 'label' column.
+
+        Returns
+        -------
+        out: DataFrame
+            The transformed data.
+    """
+    features = dataframe.columns[:-1]
+    x = dataframe.loc[:, features].values
+    x = StandardScaler().fit_transform(x)  # normalizing the features
+    transformed_ds = pca.transform(x)
+    transformed_df = pd.DataFrame(data=transformed_ds, columns=[f"principal component {i+1}" for i in range(transformed_ds.shape[1])])
+    transformed_df['label'] = dataframe['label']
+    return transformed_df
+
+
+def plot_pca(dataframe: pd.DataFrame, n_components=3, show=True, save=False, commentary="T=48H"):
+    """
+    plot_pca(dataframe, n_components, show=True, save=True):
+
+        plot the result of PCA.
+
+        Parameters
+        ----------
+        dataframe: DataFrame
+            The data to plot. Must contain a 'label' column.
+        n_components: int, optional, default: 3
+            Number of principal components. Also, teh dimension
+            of the graph. Must be equal to 2 or 3.
+        show: bool, optional, default: True
+            Whether to show the plot or not.
+        save: bool, optional, default: False
+            Whether to save the plot or not.
+        commentary: str, optional, default: "T=48H"
+            Any specification to include in the file name while saving.
+    """
+    targets = (list(set(dataframe["label"])))
     if show or save:
         if n_components == 2:
             plt.figure(figsize=(10, 10))
             plt.xticks(fontsize=12)
             plt.yticks(fontsize=14)
-            plt.xlabel(f'Principal Component - 1 ({round(pca_ratios[0] * 100, 1)}%)', fontsize=20)
-            plt.ylabel(f'Principal Component - 2 ({round(pca_ratios[1] * 100, 1)}%)', fontsize=20)
+            plt.xlabel(f'PC-1', fontsize=20)
+            plt.ylabel(f'PC-2', fontsize=20)
             plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
             colors = ['r', 'g', 'b', 'k']
             for target, color in zip(targets, colors):
-                indicesToKeep = tahynavirus_dataset['status'] == target
-                plt.scatter(principal_tahyna_Df.loc[indicesToKeep, 'principal component 1']
-                            , principal_tahyna_Df.loc[indicesToKeep, 'principal component 2'], c=color, s=10)
+                indicesToKeep = dataframe['label'] == target
+                plt.scatter(dataframe.loc[indicesToKeep, 'principal component 1']
+                            , dataframe.loc[indicesToKeep, 'principal component 2'], c=color, s=10)
             plt.legend(targets, prop={'size': 15})
         elif n_components == 3:
             plt.figure(figsize=(10, 10))
             ax = plt.axes(projection='3d')
-            ax.set_xlabel(f'Principal Component - 1 ({round(pca_ratios[0] * 100, 1)}%)', fontsize=20)
-            ax.set_ylabel(f'Principal Component - 2 ({round(pca_ratios[1] * 100, 1)}%)', fontsize=20)
-            ax.set_zlabel(f'Principal Component - 3 ({round(pca_ratios[2] * 100, 1)}%)', fontsize=20)
+            ax.set_xlabel(f'PC-1', fontsize=20)
+            ax.set_ylabel(f'PC-2', fontsize=20)
+            ax.set_zlabel(f'PC-3', fontsize=20)
             colors = ['r', 'g', 'b', 'k']
             plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
             for target, color in zip(targets, colors):
-                indicesToKeep = tahynavirus_dataset['label'] == target
-                x = principal_tahyna_Df.loc[indicesToKeep, 'principal component 1']
-                y = principal_tahyna_Df.loc[indicesToKeep, 'principal component 2']
-                z = principal_tahyna_Df.loc[indicesToKeep, 'principal component 3']
+                indicesToKeep = dataframe['label'] == target
+                x = dataframe.loc[indicesToKeep, 'principal component 1']
+                y = dataframe.loc[indicesToKeep, 'principal component 2']
+                z = dataframe.loc[indicesToKeep, 'principal component 3']
                 ax.scatter3D(x, y, z, c=color, s=10)
             plt.legend(targets, prop={'size': 15})
     if save:
-        plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets} r={record}.png"))
+        if commentary:
+            plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets} {commentary}.png"))
+        else:
+            plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets}.png"))
+
     if show:
         plt.show()
     plt.close()
 
-    principal_tahyna_Df["label"] = tahynavirus_dataset["label"]
-    return principal_tahyna_Df, pca_ratios

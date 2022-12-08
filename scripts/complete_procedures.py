@@ -1,21 +1,14 @@
-import pickle
 import os
 from pathlib import Path
-import PATHS as P
-import pandas as pd
-from sklearn.model_selection import train_test_split
 
-import signal_processing as spr
-import data_processing as dpr
-import numpy as np
-import machine_learning as ml
 import matplotlib.pyplot as plt
-import statistics
+import pandas as pd
+
+import PATHS as P
+import data_processing as dpr
+import signal_processing as spr
 from firelib.firelib import firefiles as ff
-import data_analysis as dan
-from random import randint
-import get_plots as gp
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
+
 
 def generate_stachel_dataset():
     timepoint = "T=24H"

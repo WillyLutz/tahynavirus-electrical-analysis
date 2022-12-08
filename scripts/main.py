@@ -23,38 +23,31 @@ from pathlib import Path
 
 pd.set_option('display.max_columns', None)
 import complete_procedures as cp
-import get_plots as gp
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 
 
 def main():
-    thdf, _ = ml.principal_component_analysis(("NI", "TAHV", "NI+RG27", "TAHV+RG27"), 3, save=False, show=False)
-    print(thdf.columns)
-    # todo pca into RFC or unsupervised algorithm
+    train_targets = ("NI", "TAHV")
+    test_targets = ("NI+RG27", "TAHV+RG27")
+    record = "T=48H"
+    train_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=train_targets,
+                                                     to_include=("freq_50hz_sample", record,),
+                                                     to_exclude=("TTX",),
+                                                     verbose=False, save=False, )
+    test_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=test_targets,
+                                                    to_include=("freq_50hz_sample", record,),
+                                                    to_exclude=("TTX",),
+                                                    verbose=False, save=False, )
+    pca, pca_train_dataset = ml.fit_pca(train_dataset, 3)
+    ml.plot_pca(pca_train_dataset, 3, show=False, save=True)
+    clf = ml.train_RFC_from_dataset(pca_train_dataset)
+    pca_test_dataset = ml.apply_pca(pca, test_dataset)
 
-
+    fused_df = pd.concat([pca_train_dataset, pca_test_dataset], ignore_index=True)
+    print(fused_df)
+    ml.plot_pca(fused_df, 3, show=False, save=True, commentary="fitted on NI TAHV")
 
 
 print(datetime.datetime.now())
 main()
-
-"""
-    function(param1="")
-
-        text
-
-        Parameters
-        ----------
-        param1 : type, optional, default: 'a'
-            text text text text text text text text text text text
-            text text text
-
-            .. versionadded:: 1.0.0
-
-        Returns
-        -------
-        out : type
-            text
-
-    """
