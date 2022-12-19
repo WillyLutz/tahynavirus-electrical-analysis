@@ -202,10 +202,12 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
     freq_files = []
     for parent_dir in parent_directories:
         files = ff.get_all_files(os.path.join(parent_dir))
-
         for f in files:
             if all(i in f for i in to_include) and (not any(e in f for e in to_exclude)):
-                if os.path.basename(Path(f).parent.parent) in targets_labels:
+                condition = os.path.basename(Path(f).parent.parent.parent.parent)
+                status = os.path.basename(Path(f).parent.parent)
+                label = status + " " + condition
+                if label in targets_labels:
                     freq_files.append(f)
     columns = list(range(0, 300))
     dataset = pd.DataFrame(columns=columns)
@@ -213,12 +215,11 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
     title = commentary + ""
 
     n_processed_files = 0
-
     for f in freq_files:
         df = pd.read_csv(f)
         downsampled_df = smoothing(df["mean"], 300, 'mean')
         dataset.loc[len(dataset)] = downsampled_df
-        target = os.path.basename(Path(f).parent.parent)
+        target = os.path.basename(Path(f).parent.parent) + " " + os.path.basename(Path(f).parent.parent.parent.parent)
         targets_df.loc[len(targets_df)] = target
 
         if verbose:
@@ -234,7 +235,7 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
     return dataset
 
 
-def make_filtered_sampled_freq_files():
+def make_filtered_sampled_freq_files(f):
     """
     make_filtered_sampled_freq_files():
 
@@ -244,41 +245,34 @@ def make_filtered_sampled_freq_files():
 
         Parameters
         ----------
+        f: str
+            The path of the Dataframe to transform.
         Returns
         -------
     """
-    for timepoint in ("T=0MIN", "T=30MIN", "T=48H", "T=96H"):
-        for rg27 in (P.RG27, P.NORG27):
-            files = ff.get_all_files(os.path.join(rg27, timepoint))
-            raw_files = []
-            for f in files:
-                if "pr_" in f and "TTX" not in f:
-                    raw_files.append(f)
+    print(f)
+    df = pd.read_csv(f)
+    df_top = top_n_electrodes(df, 35, "TimeStamp")
+    samples = equal_samples(df_top, 30)
+    channels = df_top.columns
+    n_sample = 0
+    for df_s in samples:
+        fft_all_channels = pd.DataFrame(columns=["Frequency [Hz]", "mean"])
 
-            for f in raw_files:
-                print(f)
-                df = pd.read_csv(f)
-                df_top = top_n_electrodes(df, 35, "TimeStamp")
-                samples = equal_samples(df_top, 30)
-                channels = df_top.columns
-                n_sample = 0
-                for df_s in samples:
-                    fft_all_channels = pd.DataFrame(columns=["Frequency [Hz]", "mean"])
+        # fft of the signal
+        for ch in channels[1:]:
+            filtered = spr.butter_filter(df_s[ch], order=3, lowcut=50)
+            clean_fft, clean_freqs = spr.fast_fourier(filtered, 10000)
+            fft_all_channels["Frequency [Hz]"] = clean_freqs
+            fft_all_channels[ch] = clean_fft
 
-                    # fft of the signal
-                    for ch in channels[1:]:
-                        filtered = spr.butter_filter(df_s[ch], order=3, lowcut=50)
-                        clean_fft, clean_freqs = spr.fast_fourier(filtered, 10000)
-                        fft_all_channels["Frequency [Hz]"] = clean_freqs
-                        fft_all_channels[ch] = clean_fft
+        # mean between the topped channels
+        df_mean = merge_all_columns_to_mean(fft_all_channels, "Frequency [Hz]").round(3)
 
-                    # mean between the topped channels
-                    df_mean = merge_all_columns_to_mean(fft_all_channels, "Frequency [Hz]").round(3)
-
-                    id = os.path.basename(f).split("_")[1]
-                    df_mean.to_csv(os.path.join(os.path.dirname(f), f"freq_50hz_sample{n_sample}_{id}.csv"),
-                                   index=False)
-                    n_sample += 1
+        id = os.path.basename(f).split("_")[1]
+        df_mean.to_csv(os.path.join(os.path.dirname(f), f"freq_50hz_sample{n_sample}_{id}.csv"),
+                       index=False)
+        n_sample += 1
 
 
 def smoothing(data, n: int, mode='mean'):
@@ -479,7 +473,7 @@ def top_n_electrodes(df, n, except_column="TimeStamp [µs]"):
             Returns a dataframe containing the top 35 channels based on the std of the signal
 
     """
-    # getting the complete name of the column to exclude, in case of slight fluctuation in names
+    # getting the complete name of the column to exclude, in case of slight fluctuation in name
     if except_column:
         for col in df.columns:
             if except_column in col:

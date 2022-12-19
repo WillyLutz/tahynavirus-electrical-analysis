@@ -2,11 +2,17 @@ import os
 
 DISK = "/media/willylutz/TOSHIBA EXT/Electrical activity analysis/TAHINAVIRUS"
 
-NORG27 = os.path.join(DISK, "-RG27")
-RG27 = os.path.join(DISK, "+RG27")
+DATA = os.path.join(DISK, "DATA")
 RESULTS = os.path.join(DISK, "RESULTS")
 MODELS = os.path.join(DISK, "MODELS")
 DATASETS = os.path.join(DISK, "DATASETS")
+
+NODRUG = os.path.join(DATA, "-DRUG")
+RG27 = os.path.join(DATA, "RG27")
+CPZ = os.path.join(DATA, "CPZ")
+FXT = os.path.join(DATA, "FXT")
+MTCL = os.path.join(DATA, "MTCL")
+VPA = os.path.join(DATA, "VPA")
 
 CORRESPONDANCE = {'NI': 0, 'TAHV': 1, 'NI+RG27': 2, 'TAHV+RG27': 3}
 

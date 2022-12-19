@@ -28,26 +28,28 @@ from sklearn.decomposition import PCA
 
 
 def main():
-    train_targets = ("NI", "TAHV")
-    test_targets = ("NI+RG27", "TAHV+RG27")
-    record = "T=48H"
-    train_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=train_targets,
-                                                     to_include=("freq_50hz_sample", record,),
-                                                     to_exclude=("TTX",),
-                                                     verbose=False, save=False, )
-    test_dataset = dpr.make_dataset_from_freq_files(parent_directories=[P.DISK, ], targets_labels=test_targets,
-                                                    to_include=("freq_50hz_sample", record,),
-                                                    to_exclude=("TTX",),
-                                                    verbose=False, save=False, )
-    pca, pca_train_dataset = ml.fit_pca(train_dataset, 3)
-    ml.plot_pca(pca_train_dataset, 3, show=False, save=True)
-    clf = ml.train_RFC_from_dataset(pca_train_dataset)
-    pca_test_dataset = ml.apply_pca(pca, test_dataset)
+    # todo : pre processing for drugs
+    df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=("NI VPA", "NI -DRUG"),
+                                          to_include=("T=48H", "freq_50hz"),
+                                          to_exclude=("TTX",),
+                                          save=False)
+    pca, pcdf, _ = ml.fit_pca(df, n_components=2)
 
-    fused_df = pd.concat([pca_train_dataset, pca_test_dataset], ignore_index=True)
-    print(fused_df)
-    ml.plot_pca(fused_df, 3, show=False, save=True, commentary="fitted on NI TAHV")
+    inf_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=("TAHV -DRUG",),
+                                              to_include=("T=48H", "freq_50hz"),
+                                              to_exclude=("TTX",),
+                                              save=False)
+    commentary = "binary drug classification"
+    pc_inf = ml.apply_pca(pca, inf_df)
+    full_df = pd.concat([pcdf, pc_inf], ignore_index=True)
+    ml.plot_pca(full_df, 2, show=False, save=True, commentary=commentary)
+    rfc, scores = ml.train_RFC_from_dataset(pcdf)
+    ml.test_model(rfc, full_df, training_targets=("NI VPA", "NI -DRUG"),
+                  testing_targets=("NI VPA", "NI -DRUG", "TAHV -DRUG"),
+                  save=True, show=False, commentary=commentary, iterations=10)
+    print(scores)
 
-
-print(datetime.datetime.now())
+now = datetime.datetime.now()
+print(now)
 main()
+print("RUN:", datetime.datetime.now()-now)
