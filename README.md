@@ -1,4 +1,4 @@
-# Tahinavirus Electrical Analysis
+# Tahynavirus Electrical Analysis
 
 
 
