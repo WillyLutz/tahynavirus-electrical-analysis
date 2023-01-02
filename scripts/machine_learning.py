@@ -1,9 +1,12 @@
 import os
 import pickle
 import sys
+from random import randint
 
 import plotly.express as px
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
+from matplotlib.patches import Ellipse
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -13,7 +16,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from umap import UMAP
 from scipy.spatial import ConvexHull
-
+from matplotlib.collections import PathCollection
+from matplotlib.legend_handler import HandlerPathCollection, HandlerLine2D
 
 import PATHS as P
 
@@ -130,7 +134,8 @@ def get_top_features_from_trained_model(clf, percentage=0.05, show=False, save=F
     return idx_foi, mean_importances_over_iterations
 
 
-def test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, iterations=10, commentary=""):
+def test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, iterations=10,
+               commentary=""):
     """
         test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, commentary=""):
 
@@ -214,15 +219,14 @@ def test_model(clf, dataset, training_targets, verbose=False, show=True, testing
         mean_probabilities = np.zeros((len(training_targets), len(testing_targets)))
         for i in range(len(probabilities_matrix)):
             for j in range(len(probabilities_matrix[i])):
-
                 mean_probabilities[i][j] = np.mean(probabilities_matrix[i][j])
         all_matrixes.append(matrix)
         all_probability_matrixes.append(mean_probabilities)
 
     mixed_labels_matrix = np.empty((len(training_targets), len(testing_targets))).tolist()
     mean_probabilities_matrix = np.empty((len(training_targets), len(testing_targets)))
-    overall_matrix = np.mean(np.array([i for i in all_matrixes]), axis=0 )
-    overall_probabilities = np.mean(np.array([i for i in all_probability_matrixes]), axis=0 )
+    overall_matrix = np.mean(np.array([i for i in all_matrixes]), axis=0)
+    overall_probabilities = np.mean(np.array([i for i in all_probability_matrixes]), axis=0)
 
     # averaging the probabilities
     for i in range(len(overall_probabilities)):
@@ -281,7 +285,7 @@ def fit_pca(dataframe, n_components=3):
     features = dataframe.columns[:-1]
     x = dataframe.loc[:, features].values
     x = StandardScaler().fit_transform(x)  # normalizing the features
-    pca = PCA(n_components=n_components, )
+    pca = PCA(n_components=n_components)
     principalComponent = pca.fit_transform(x)
     principal_component_columns = [f"principal component {i + 1}" for i in range(n_components)]
 
@@ -323,7 +327,61 @@ def apply_pca(pca: PCA, dataframe):
     return transformed_df
 
 
-def plot_pca(dataframe: pd.DataFrame, n_components=3, show=True, save=False, commentary="T=48H"):
+def confidence_ellipse(x, y, ax, n_std=3.0, color='none', **kwargs):
+    """
+    Create a plot of the covariance confidence ellipse of *x* and *y*.
+
+    Parameters
+    ----------
+    x, y : array-like, shape (n, )
+        Input data.
+
+    ax : matplotlib.axes.Axes
+        The axes object to draw the ellipse into.
+
+    n_std : float
+        The number of standard deviations to determine the ellipse's radiuses.
+
+    **kwargs
+        Forwarded to `~matplotlib.patches.Ellipse`
+
+    Returns
+    -------
+    matplotlib.patches.Ellipse
+    """
+    if x.size != y.size:
+        raise ValueError("x and y must be the same size")
+
+    cov = np.cov(x, y)
+    pearson = cov[0, 1] / np.sqrt(cov[0, 0] * cov[1, 1])
+    # Using a special case to obtain the eigenvalues of this
+    # two-dimensional dataset.
+    ell_radius_x = np.sqrt(1 + pearson)
+    ell_radius_y = np.sqrt(1 - pearson)
+    ellipse = Ellipse((0, 0), width=ell_radius_x * 2, height=ell_radius_y * 2,
+                      color=color, **kwargs)
+
+    # Calculating the standard deviation of x from
+    # the squareroot of the variance and multiplying
+    # with the given number of standard deviations.
+    scale_x = np.sqrt(cov[0, 0]) * n_std
+    mean_x = np.mean(x)
+
+    # calculating the standard deviation of y ...
+    scale_y = np.sqrt(cov[1, 1]) * n_std
+    mean_y = np.mean(y)
+
+    transf = transforms.Affine2D() \
+        .rotate_deg(45) \
+        .scale(scale_x, scale_y) \
+        .translate(mean_x, mean_y)
+
+    ellipse.set_transform(transf + ax.transData)
+    return ax.add_patch(ellipse)
+
+
+def plot_pca(dataframe: pd.DataFrame, n_components=3, show=True, save=False, commentary="T=48H", points=True,
+             metrics=False):
     """
     plot_pca(dataframe, n_components, show=True, save=True):
 
@@ -342,24 +400,44 @@ def plot_pca(dataframe: pd.DataFrame, n_components=3, show=True, save=False, com
             Whether to save the plot or not.
         commentary: str, optional, default: "T=48H"
             Any specification to include in the file name while saving.
+        points: bool, optional, default: True
+            whether to plot the points or not.
+        metrics: bool, optional, default: False
+            Whether to plot the metrics or not
     """
     targets = (sorted(list(set(dataframe["label"]))))
-    colors = ['r', 'g', 'b', 'k', 'sandybrown', 'deeppink', 'gray' ]
+    colors = ['r', 'g', 'b', 'k', 'sandybrown', 'deeppink', 'gray']
+    if len(targets) > len(colors):
+        n = len(targets) - len(colors) + 1
+        for i in range(n):
+            colors.append('#%06X' % randint(0, 0xFFFFFF))
+
     if n_components == 2:
-        plt.figure(figsize=(10, 10))
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
         plt.xticks(fontsize=12)
         plt.yticks(fontsize=14)
         plt.xlabel(f'PC-1', fontsize=20)
         plt.ylabel(f'PC-2', fontsize=20)
         plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
-
         for target, color in zip(targets, colors):
             indicesToKeep = dataframe['label'] == target
             x = dataframe.loc[indicesToKeep, 'principal component 1']
             y = dataframe.loc[indicesToKeep, 'principal component 2']
-            # plot shape
-            plt.scatter(x, y, c=color, s=10)
-        plt.legend(targets, prop={'size': 15})
+            if points:
+                alpha = 1
+                if metrics:
+                    alpha = .2
+                plt.scatter(x, y, c=color, s=10, alpha=alpha, label=target)
+            if metrics:
+                plt.scatter(np.mean(x), np.mean(y), marker="+", color=color, linewidth=2, s=160)
+                confidence_ellipse(x, y, ax, n_std=1.0, color=color, fill=False, linewidth=2)
+
+        def update(handle, orig):
+            handle.update_from(orig)
+            handle.set_alpha(1)
+
+        plt.legend(prop={'size': 15}, handler_map={PathCollection: HandlerPathCollection(update_func=update),
+                                                   plt.Line2D: HandlerLine2D(update_func=update)})
     elif n_components == 3:
         plt.figure(figsize=(10, 10))
         ax = plt.axes(projection='3d')
@@ -485,7 +563,7 @@ def plot_umap(dataframe, n_component=3, save=False, show=True, commentary="T=48H
     ax.set_ylabel(f'dimension-2', fontsize=20)
     ax.set_zlabel(f'dimension-3', fontsize=20)
     targets = (sorted(list(set(dataframe["label"]))))
-    colors = ['tomato', 'forestgreen', 'cornflowerblue', 'orange', 'sandybrown', 'maroon', 'black' ]
+    colors = ['tomato', 'forestgreen', 'cornflowerblue', 'orange', 'sandybrown', 'maroon', 'black']
     for target, color in zip(targets, colors):
         indicesToKeep = dataframe['label'] == target
         x = dataframe.loc[indicesToKeep, dataframe.columns[0]]

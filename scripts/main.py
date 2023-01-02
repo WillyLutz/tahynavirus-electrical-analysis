@@ -20,6 +20,7 @@ from firelib.firelib import firefiles as ff, firelearn as fl
 import pickle
 import forestci as fci
 from pathlib import Path
+from scipy.spatial import ConvexHull, convex_hull_plot_2d
 
 pd.set_option('display.max_columns', None)
 import complete_procedures as cp
@@ -28,28 +29,29 @@ from sklearn.decomposition import PCA
 
 
 def main():
-    # todo : pre processing for drugs
-    df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=("NI VPA", "NI -DRUG"),
-                                          to_include=("T=48H", "freq_50hz"),
-                                          to_exclude=("TTX",),
-                                          save=False)
-    pca, pcdf, _ = ml.fit_pca(df, n_components=2)
+    for tested in ['VPA', 'CPZ', 'MTCL', 'FXT']:
+        train_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=(f"NI {tested}", "NI -DRUG"),
+                                                    to_include=("T=48H", "freq_50hz"),
+                                                    to_exclude=("TTX", "NI/4", "TAHV/4"),
+                                                    save=False,
+                                                    separate_organoids=False)
+        pca, pcdf, _ = ml.fit_pca(train_df, n_components=3)
+        test_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=(f"TAHV -DRUG",),
+                                                   to_include=("T=48H", "freq_50hz"),
+                                                   to_exclude=("TTX", "NI/4", "TAHV/4"),
+                                                   save=False,
+                                                   separate_organoids=False)
+        pc_inf = ml.apply_pca(pca, test_df)
+        full_df = pd.concat([pcdf, pc_inf], ignore_index=True)
 
-    inf_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=("TAHV -DRUG",),
-                                              to_include=("T=48H", "freq_50hz"),
-                                              to_exclude=("TTX",),
-                                              save=False)
-    commentary = "binary drug classification"
-    pc_inf = ml.apply_pca(pca, inf_df)
-    full_df = pd.concat([pcdf, pc_inf], ignore_index=True)
-    ml.plot_pca(full_df, 2, show=False, save=True, commentary=commentary)
-    rfc, scores = ml.train_RFC_from_dataset(pcdf)
-    ml.test_model(rfc, full_df, training_targets=("NI VPA", "NI -DRUG"),
-                  testing_targets=("NI VPA", "NI -DRUG", "TAHV -DRUG"),
-                  save=True, show=False, commentary=commentary, iterations=10)
-    print(scores)
+        ml.plot_pca(full_df, n_components=3, show=False, save=False, commentary="3D binary testing on drugs no outsider",
+                    points=True, metrics=False)
+        rfc, _ = ml.train_RFC_from_dataset(pcdf)
+
+        ml.test_model(rfc, full_df, training_targets=("NI -DRUG", f"NI {tested}"), testing_targets=("NI -DRUG", f"NI {tested}", 'TAHV -DRUG',), show=False, save=True, commentary="3D binary testing on drugs no outsider")
+
 
 now = datetime.datetime.now()
 print(now)
 main()
-print("RUN:", datetime.datetime.now()-now)
+print("RUN:", datetime.datetime.now() - now)

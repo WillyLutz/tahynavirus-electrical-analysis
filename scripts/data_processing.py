@@ -159,7 +159,7 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=()
 
 
 def make_dataset_from_freq_files(parent_directories, targets_labels, to_include, to_exclude=(), save=False,
-                                 verbose=False, commentary="", ):
+                                 verbose=False, commentary="", separate_organoids=False ):
     """
     make_dataset_from_freq_files(parent_directories, commentary="", targets_labels=(), to_include=(), to_exclude=(), save=False, verbose=False)
 
@@ -186,6 +186,8 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
             Whether we save the resulting dataframe as a .csv file or not.
         verbose : bool, optional, default: False
             Whether to print more information on the processing or not.
+        separate_organoids : bool, optional, default: False
+            Whether to consider the different organoids as different labels or not.
 
             .. versionadded:: 1.0.0
 
@@ -220,6 +222,8 @@ def make_dataset_from_freq_files(parent_directories, targets_labels, to_include,
         downsampled_df = smoothing(df["mean"], 300, 'mean')
         dataset.loc[len(dataset)] = downsampled_df
         target = os.path.basename(Path(f).parent.parent) + " " + os.path.basename(Path(f).parent.parent.parent.parent)
+        if separate_organoids:
+            target = target + " " + os.path.basename(Path(f).parent)
         targets_df.loc[len(targets_df)] = target
 
         if verbose:
