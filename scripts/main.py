@@ -16,11 +16,13 @@ import machine_learning as ml
 import seaborn as sns
 import PATHS as P
 import data_processing as dp
-from firelib.firelib import firefiles as ff, firelearn as fl
 import pickle
 import forestci as fci
 from pathlib import Path
 from scipy.spatial import ConvexHull, convex_hull_plot_2d
+import fiiireflyyy.firelearn as fl
+import fiiireflyyy.firefiles as ff
+import fiiireflyyy.fireprocess as fp
 
 pd.set_option('display.max_columns', None)
 import complete_procedures as cp
@@ -29,26 +31,62 @@ from sklearn.decomposition import PCA
 
 
 def main():
-    for tested in ['VPA', 'CPZ', 'MTCL', 'FXT']:
-        train_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=(f"NI {tested}", "NI -DRUG"),
-                                                    to_include=("T=48H", "freq_50hz"),
-                                                    to_exclude=("TTX", "NI/4", "TAHV/4"),
-                                                    save=False,
-                                                    separate_organoids=False)
-        pca, pcdf, _ = ml.fit_pca(train_df, n_components=3)
-        test_df = dpr.make_dataset_from_freq_files([P.DATA, ], targets_labels=(f"TAHV -DRUG",),
-                                                   to_include=("T=48H", "freq_50hz"),
-                                                   to_exclude=("TTX", "NI/4", "TAHV/4"),
-                                                   save=False,
-                                                   separate_organoids=False)
-        pc_inf = ml.apply_pca(pca, test_df)
-        full_df = pd.concat([pcdf, pc_inf], ignore_index=True)
+    for batch in ["batch 1", "batch 2", "batch 12", ]:
+        fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch)
 
-        ml.plot_pca(full_df, n_components=3, show=False, save=False, commentary="3D binary testing on drugs no outsider",
-                    points=True, metrics=False)
-        rfc, _ = ml.train_RFC_from_dataset(pcdf)
 
-        ml.test_model(rfc, full_df, training_targets=("NI -DRUG", f"NI {tested}"), testing_targets=("NI -DRUG", f"NI {tested}", 'TAHV -DRUG',), show=False, save=True, commentary="3D binary testing on drugs no outsider")
+def fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch):
+    show = False
+    percentiles = 0.1
+    n_components = 2
+    batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
+               "batch 12": ["1", "2", "3", "4", "5", "6", ],
+               "all slices": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]}
+    min_freq = 0
+    max_freq = 5000
+    tahvni = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
+                                             to_include=("freq_50hz_sample", "T=48H"),
+                                             to_exclude=("TTX", "RG27",),
+                                             target_keys={"NI": "NI", "TAHV": "TAHV"},
+                                             verbose=False,
+                                             save=False,
+                                             freq_range=(min_freq, max_freq),
+                                             select_samples=batches[batch],
+                                             separate_samples=False,
+                                             label_comment="")
+
+    discarded_tahvni = fp.discard_outliers_by_iqr(tahvni, low_percentile=percentiles,
+                                                  high_percentile=1 - percentiles,
+                                                  mode='capping')
+
+    tahv_rg27 = fp.make_dataset_from_freq_files(parent_dir=P.RG27,
+                                                to_include=("freq_50hz_sample", "T=48H", "RG27"),
+                                                to_exclude=("TTX", "NI"),
+                                                target_keys={"NI": "NI", "TAHV": "TAHV"},
+                                                verbose=False,
+                                                save=False,
+                                                freq_range=(min_freq, max_freq),
+                                                select_samples=batches[batch],
+                                                separate_samples=False,
+                                                label_comment="")
+
+    discarded_tahv_rg27 = fp.discard_outliers_by_iqr(tahv_rg27, low_percentile=percentiles,
+                                                     high_percentile=1 - percentiles,
+                                                     mode='capping')
+
+    discarded_tahvni.replace("NI", "Mock", inplace=True)
+    discarded_tahvni.replace("TAHV", "Tahv", inplace=True)
+    discarded_tahv_rg27.replace("TAHV", "RG27-treated Tahv", inplace=True)
+    rfc, _ = fl.train_RFC_from_dataset(discarded_tahvni)
+
+    global_df = pd.concat([discarded_tahvni, discarded_tahv_rg27], ignore_index=True)
+    fl.test_model_by_confusion(rfc, global_df, training_targets=(f'Mock', f'Tahv'),
+                               testing_targets=(
+                                   f'Mock', f'Tahv', f'RG27-treated Tahv',),
+                               show=show, verbose=False, savepath=P.RESULTS,
+                               title=f"Fig Confusion matrix train on T=48H Mock,Tahv test on Mock,Tahv,Stachel for {batch} "
+                                     f"{min_freq}-{max_freq}Hz",
+                               iterations=5, )
 
 
 now = datetime.datetime.now()

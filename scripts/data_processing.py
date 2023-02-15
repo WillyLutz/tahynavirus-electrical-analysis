@@ -6,10 +6,13 @@ import pandas as pd
 import signal_processing as spr
 import numpy as np
 import machine_learning as ml
-from firelib.firelib import firefiles as ff
-import PATHS as P
+import fiiireflyyy.firelearn as fl
+import fiiireflyyy.firefiles as ff
 from pathlib import Path
 import matplotlib.pyplot as plt
+import PATHS as P
+
+
 
 
 def make_highest_features_dataset_from_complete_dataset(foi, df, percentage=0.05, save=False):
@@ -158,86 +161,6 @@ def make_raw_frequency_plots_from_pr_files(parent_dir, to_include, to_exclude=()
     return ax
 
 
-def make_dataset_from_freq_files(parent_directories, targets_labels, to_include, to_exclude=(), save=False,
-                                 verbose=False, commentary="", separate_organoids=False ):
-    """
-    make_dataset_from_freq_files(parent_directories, commentary="", targets_labels=(), to_include=(), to_exclude=(), save=False, verbose=False)
-
-        Return a pandas Dataframe where each row is an entry for a machine lerning model. Use frequency files and smoothen
-        them down to 300 values used as features.
-
-        Parameters
-        ----------
-        parent_directories : tuple or list
-            System paths from where the searching for frequency files will r
-            ecursively occur
-        targets_labels : tuple of str
-            Name of the targets_labels we want to classify on. They must be written
-            in the path as the grand-grand-parent of the frequency file.
-        to_include : tuple of str
-            Allow to select children paths of parent_directories. All the
-            elements in to_include must be present in the path for it to be
-            selected.
-        to_exclude : tuple of str
-            Allow to select children paths of parent_directories. A path
-            will not be selected if any element of to_exclude is present
-            in the path.
-        save : bool, optional, default: False
-            Whether we save the resulting dataframe as a .csv file or not.
-        verbose : bool, optional, default: False
-            Whether to print more information on the processing or not.
-        separate_organoids : bool, optional, default: False
-            Whether to consider the different organoids as different labels or not.
-
-            .. versionadded:: 1.0.0
-
-        Returns
-        -------
-        out : dataframe
-            a pandas Dataframe where each row is an entry for a machine
-            learning model. Use frequency files and smoothen them down
-            to 300 values used as features. Has a last column as 'target'
-            containing the target value for each entry based on the
-            original path of the file where it came from.
-
-    """
-    freq_files = []
-    for parent_dir in parent_directories:
-        files = ff.get_all_files(os.path.join(parent_dir))
-        for f in files:
-            if all(i in f for i in to_include) and (not any(e in f for e in to_exclude)):
-                condition = os.path.basename(Path(f).parent.parent.parent.parent)
-                status = os.path.basename(Path(f).parent.parent)
-                label = status + " " + condition
-                if label in targets_labels:
-                    freq_files.append(f)
-    columns = list(range(0, 300))
-    dataset = pd.DataFrame(columns=columns)
-    targets_df = pd.DataFrame(columns=["label", ])
-    title = commentary + ""
-
-    n_processed_files = 0
-    for f in freq_files:
-        df = pd.read_csv(f)
-        downsampled_df = smoothing(df["mean"], 300, 'mean')
-        dataset.loc[len(dataset)] = downsampled_df
-        target = os.path.basename(Path(f).parent.parent) + " " + os.path.basename(Path(f).parent.parent.parent.parent)
-        if separate_organoids:
-            target = target + " " + os.path.basename(Path(f).parent)
-        targets_df.loc[len(targets_df)] = target
-
-        if verbose:
-            progress = int(np.ceil(n_processed_files / len(freq_files) * 100))
-            sys.stdout.write(f"\rProgression of processing files: {progress}%")
-            sys.stdout.flush()
-            n_processed_files += 1
-    dataset["label"] = targets_df["label"]
-    if verbose:
-        print("\n")
-    if save:
-        dataset.to_csv(os.path.join(P.DATASETS, title + ".csv"), index=False)
-    return dataset
-
 
 def make_filtered_sampled_freq_files(f):
     """
@@ -279,72 +202,8 @@ def make_filtered_sampled_freq_files(f):
         n_sample += 1
 
 
-def smoothing(data, n: int, mode='mean'):
-    """
-    smoothing(data, n: int, mode: str):
-
-        Smoothen a signal down to n values, depending on the
-        smoothing mode.
-
-        Parameters
-        ----------
-        data: list of int, list of float
-            contains the numerical data to smoothen.
-        n: int
-            number of points to down sample the data to.
-        mode: str, optional, default: 'mean'
-            the way to smoothen the data between the points.
-
-        Returns
-        -------
-        out: list of floats
-            the smoothened data.
-
-    """
-    if len(data.index) > n:
-        step = int(len(data.index) / n)
-        lower_limit = 0
-        upper_limit = step
-        ds_data = []
-        if mode == 'mean':
-            while upper_limit <= len(data):
-                ds_data.append(np.mean(data[lower_limit:upper_limit]).round(3))
-                lower_limit = upper_limit
-                upper_limit += step
-        excedent = len(ds_data) - n
-        ds_data = ds_data[:-excedent or None]
-        return ds_data
-    else:
-        raise Exception("downsampling: length of data " + str(len(data.index)) + "< n " + str(n))
 
 
-def equal_samples(df, n):
-    """
-    equal_samples(df, n):
-
-        cuts a DataFrame in n sub-DataFrame of same length.
-
-        Parameters
-        ----------
-        df: DataFrame
-            Object to cut, row-wise.
-        n: int
-            number of resulting samples.
-
-        Returns
-        -------
-        out: list of DataFrame
-            contains all the sub DataFrames.
-    """
-    step = int(len(df) / n)
-    lower_limit = 0
-    upper_limit = step
-    samples = []
-    while upper_limit <= len(df):
-        samples.append(df[lower_limit:upper_limit])
-        lower_limit = upper_limit
-        upper_limit += step
-    return samples
 
 
 def dataframe_to_frequencies(df, file_path="", sf=10000):

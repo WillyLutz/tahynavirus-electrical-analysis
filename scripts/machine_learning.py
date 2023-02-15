@@ -18,6 +18,7 @@ from umap import UMAP
 from scipy.spatial import ConvexHull
 from matplotlib.collections import PathCollection
 from matplotlib.legend_handler import HandlerPathCollection, HandlerLine2D
+import fiiireflyyy.firelearn as fl
 
 import PATHS as P
 
@@ -134,132 +135,6 @@ def get_top_features_from_trained_model(clf, percentage=0.05, show=False, save=F
     return idx_foi, mean_importances_over_iterations
 
 
-def test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, iterations=10,
-               commentary=""):
-    """
-        test_model(clf, dataset, training_targets, verbose=False, show=True, testing_targets=(), save=False, commentary=""):
-
-            Test an already trained Random forest classifier model,
-            resulting in a confusion matrix. The test can be done
-            on targets_labels different from the targets_labels used for training
-            the model.
-
-            Parameters
-            ----------
-            clf: RandomForestClassifier
-                the trained model.
-            dataset:  pandas Dataframe.
-                Dataframe containing the data used for testing the
-                model. The rows are the entries, and the columns are
-                the features on which the model has been trained.
-                The last column is 'status' containing the labels
-                of the targets_labels for each entry.
-            training_targets: tuple of str
-
-    """
-    # todo: make testing over iterations
-    if not testing_targets:
-        testing_targets = training_targets
-
-    CORRESPONDANCE = {}
-    target_id = 0
-    for t in training_targets:
-        if t not in CORRESPONDANCE:
-            CORRESPONDANCE[t] = target_id
-            target_id += 1
-    for t in testing_targets:
-        if t not in CORRESPONDANCE:
-            CORRESPONDANCE[t] = target_id
-            target_id += 1
-
-    print(CORRESPONDANCE)
-    X = dataset[dataset.columns[:-1]]
-    y = dataset["label"]
-
-    if verbose:
-        progress = 0
-        sys.stdout.write(f"\rTesting model: {progress}%")
-        sys.stdout.flush()
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3)
-
-    # get predictions and probabilities
-    all_matrixes = []
-    all_probability_matrixes = []
-    title = f"train {training_targets}-test {testing_targets} {commentary} iter={iterations}"
-    for iters in range(iterations):
-        matrix = np.zeros((len(training_targets), len(testing_targets)))
-        probabilities_matrix = np.empty((len(training_targets), len(testing_targets)), dtype=object)
-
-        # Initializing the matrix containing the probabilities
-        for i in range(len(probabilities_matrix)):
-            for j in range(len(probabilities_matrix[i])):
-                probabilities_matrix[i][j] = []
-
-        # Making predictions and storing the results in predictions[]
-        predictions = []
-        for i in X_test.index:
-            row = X_test.loc[i, :]
-            y_pred = clf.predict([row])[0]
-            proba_class = clf.predict_proba([row])[0]
-            predictions.append((y_pred, proba_class))
-
-        #
-        targets = []
-        for i in y_test.index:
-            targets.append(y_test.loc[i])
-        # Building the confusion matrix
-        for i in range(len(targets)):
-            y_true = targets[i]
-            y_pred = predictions[i][0]
-            y_proba = max(predictions[i][1])
-            matrix[CORRESPONDANCE[y_pred]][CORRESPONDANCE[y_true]] += 1
-
-            probabilities_matrix[CORRESPONDANCE[y_pred]][CORRESPONDANCE[y_true]].append(y_proba)
-        mean_probabilities = np.zeros((len(training_targets), len(testing_targets)))
-        for i in range(len(probabilities_matrix)):
-            for j in range(len(probabilities_matrix[i])):
-                mean_probabilities[i][j] = np.mean(probabilities_matrix[i][j])
-        all_matrixes.append(matrix)
-        all_probability_matrixes.append(mean_probabilities)
-
-    mixed_labels_matrix = np.empty((len(training_targets), len(testing_targets))).tolist()
-    mean_probabilities_matrix = np.empty((len(training_targets), len(testing_targets)))
-    overall_matrix = np.mean(np.array([i for i in all_matrixes]), axis=0)
-    overall_probabilities = np.mean(np.array([i for i in all_probability_matrixes]), axis=0)
-
-    # averaging the probabilities
-    for i in range(len(overall_probabilities)):
-        for j in range(len(overall_probabilities[i])):
-            mean_probabilities_matrix[i][j] = np.mean(overall_probabilities[i][j])
-
-    # mixing count and probabilities for displaying
-    for i in range(len(overall_probabilities)):
-        for j in range(len(overall_probabilities[i])):
-            np.nan_to_num(overall_matrix[i][j])
-            np.nan_to_num(mean_probabilities_matrix[i][j])
-            mixed_labels_matrix[i][j] = str(int(overall_matrix[i][j])) + "\nCUP=" + str(
-                round(mean_probabilities_matrix[i][j], 3))
-
-    # plotting
-    fig, ax = plt.subplots(1, 1, figsize=(7 / 4 * len(testing_targets), 6 / 4 * len(training_targets)))
-
-    fig.suptitle("")
-    sns.heatmap(ax=ax, data=overall_matrix, annot=mixed_labels_matrix, fmt='')
-    ax.xaxis.tick_top()
-    ax.xaxis.set_label_position('top')
-    ax.set_ylabel("The input is classified as")
-    ax.set_xlabel("The input is")
-    ax.set_xticks([CORRESPONDANCE[x] + 0.5 for x in testing_targets], testing_targets)
-    ax.set_yticks([CORRESPONDANCE[x] + 0.5 for x in training_targets], training_targets)
-    plt.tight_layout()
-
-    if save:
-        plt.savefig(os.path.join(P.RESULTS, "Confusion matrix-" + title + ".png"))
-    if show:
-        plt.show()
-
-    # all_metrics.append(((positive_class, negative_class), (tp, tn, fp, fn)))
 
 
 def fit_pca(dataframe, n_components=3):
@@ -380,90 +255,125 @@ def confidence_ellipse(x, y, ax, n_std=3.0, color='none', **kwargs):
     return ax.add_patch(ellipse)
 
 
-def plot_pca(dataframe: pd.DataFrame, n_components=3, show=True, save=False, commentary="T=48H", points=True,
-             metrics=False):
+def plot_pca(dataframe: pd.DataFrame, **kwargs): # todo: to fiiireflyyy
     """
-    plot_pca(dataframe, n_components, show=True, save=True):
+    plot the result of PCA.
 
-        plot the result of PCA.
-
-        Parameters
-        ----------
-        dataframe: DataFrame
-            The data to plot. Must contain a 'label' column.
-        n_components: int, optional, default: 3
-            Number of principal components. Also, teh dimension
-            of the graph. Must be equal to 2 or 3.
-        show: bool, optional, default: True
-            Whether to show the plot or not.
-        save: bool, optional, default: False
-            Whether to save the plot or not.
-        commentary: str, optional, default: "T=48H"
-            Any specification to include in the file name while saving.
-        points: bool, optional, default: True
-            whether to plot the points or not.
-        metrics: bool, optional, default: False
-            Whether to plot the metrics or not
+    Parameters
+    ----------
+    dataframe: DataFrame
+        The data to plot. Must contain a 'label' column.
+    n_components: int, optional, default: 2
+        Number of principal components. Also, teh dimension
+        of the graph. Must be equal to 2 or 3.
+    show: bool, optional, default: True
+        Whether to show the plot or not.
+    save: bool, optional, default: False
+        Whether to save the plot or not.
+    commentary: str, optional, default: "T=48H"
+        Any specification to include in the file name while saving.
+    points: bool, optional, default: True
+        whether to plot the points or not.
+    metrics: bool, optional, default: False
+        Whether to plot the metrics or not
+    savedir: str, optional, default: ""
+        Directory where to save the resulting plot, if not empty.
+    title: str, optional, defualt: ""
+        The filename of the resulting plot. If empty,
+        an automatic name will be generated.
+    ratios: tuple of float, optional, default: ()
+        the PCA explained variance ratio
     """
-    targets = (sorted(list(set(dataframe["label"]))))
-    colors = ['r', 'g', 'b', 'k', 'sandybrown', 'deeppink', 'gray']
+
+    options = {
+        'n_components': 2,
+        'show': True,
+        'commentary': "",
+        'points': True,
+        'metrics': False,
+        'savedir': "",
+        'pc_ratios': [],
+        'title': "",
+        'ratios': ()
+
+    }
+
+    options.update(kwargs)
+    targets = (list(set(dataframe["label"])))
+    colors = ['g', 'b', 'r', 'k', 'sandybrown', 'deeppink', 'gray']
     if len(targets) > len(colors):
         n = len(targets) - len(colors) + 1
         for i in range(n):
             colors.append('#%06X' % randint(0, 0xFFFFFF))
 
-    if n_components == 2:
-        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
-        plt.xticks(fontsize=12)
-        plt.yticks(fontsize=14)
-        plt.xlabel(f'PC-1', fontsize=20)
-        plt.ylabel(f'PC-2', fontsize=20)
-        plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
+    label_params = {'fontsize': 20, "labelpad": 8}
+    ticks_params = {'fontsize': 20, }
+    if options['n_components'] == 2:
+        fig, ax = plt.subplots(1, 1, figsize=(12, 10))
+
+        plt.xticks(**ticks_params)
+        plt.yticks(**ticks_params)
+        xlabel = f'Principal Component-1 ({options["ratios"][0]}%)'
+        ylabel = f'Principal Component-2 ({options["ratios"][1]}%)'
+        if len(options['pc_ratios']):
+            xlabel += f" ({round(options['pc_ratios'][0] * 100, 2)}%)"
+            ylabel += f" ({round(options['pc_ratios'][1] * 100, 2)}%)"
+
+        plt.xlabel(xlabel, **label_params)
+        plt.ylabel(ylabel, **label_params)
+
         for target, color in zip(targets, colors):
             indicesToKeep = dataframe['label'] == target
             x = dataframe.loc[indicesToKeep, 'principal component 1']
             y = dataframe.loc[indicesToKeep, 'principal component 2']
-            if points:
+            if options['points']:
                 alpha = 1
-                if metrics:
+                if options['metrics']:
                     alpha = .2
                 plt.scatter(x, y, c=color, s=10, alpha=alpha, label=target)
-            if metrics:
+            if options['metrics']:
                 plt.scatter(np.mean(x), np.mean(y), marker="+", color=color, linewidth=2, s=160)
-                confidence_ellipse(x, y, ax, n_std=1.0, color=color, fill=False, linewidth=2)
+                fl.confidence_ellipse(x, y, ax, n_std=1.0, color=color, fill=False, linewidth=2)
 
         def update(handle, orig):
             handle.update_from(orig)
             handle.set_alpha(1)
 
-        plt.legend(prop={'size': 15}, handler_map={PathCollection: HandlerPathCollection(update_func=update),
+        plt.legend(prop={'size': 25}, handler_map={PathCollection: HandlerPathCollection(update_func=update),
                                                    plt.Line2D: HandlerLine2D(update_func=update)})
-    elif n_components == 3:
+    elif options['n_components'] == 3:
         plt.figure(figsize=(10, 10))
         ax = plt.axes(projection='3d')
-        ax.set_xlabel(f'PC-1', fontsize=20)
-        ax.set_ylabel(f'PC-2', fontsize=20)
-        ax.set_zlabel(f'PC-3', fontsize=20)
-        plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
+
+        xlabel = f'Principal Component-1 ({options["ratios"][0]}%)'
+        ylabel = f'Principal Component-2 ({options["ratios"][1]}%)'
+        zlabel = f'Principal Component-3 ({options["ratios"][2]}%)'
+        if len(options['pc_ratios']):
+            xlabel += f" ({round(options['pc_ratios'][0] * 100, 2)}%)"
+            ylabel += f" ({round(options['pc_ratios'][1] * 100, 2)}%)"
+            zlabel += f" ({round(options['pc_ratios'][2] * 100, 2)}%)"
+
+        ax.set_xlabel(xlabel, **label_params)
+        ax.set_ylabel(ylabel, **label_params)
+        ax.set_zlabel(zlabel, **label_params)
         for target, color in zip(targets, colors):
             indicesToKeep = dataframe['label'] == target
             x = dataframe.loc[indicesToKeep, 'principal component 1']
             y = dataframe.loc[indicesToKeep, 'principal component 2']
             z = dataframe.loc[indicesToKeep, 'principal component 3']
             ax.scatter3D(x, y, z, c=color, s=10)
-        plt.legend(targets, prop={'size': 15})
-        plt.title(f"Principal Component Analysis for TAHV infection", fontsize=20)
+        plt.legend(targets, prop={'size': 18})
 
-    if save:
-        if commentary:
-            plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets} {commentary}.png"))
-        else:
-            plt.savefig(os.path.join(P.RESULTS, f"PCA n={n_components} t={targets}.png"))
+    if options['savedir']:
+        if options["title"] == "":
+            if options['commentary']:
+                options["title"] += options["commentary"]
 
-    if show:
+        plt.savefig(os.path.join(options['savedir'], options["title"] + ".png"), dpi=1200)
+
+    if options['show']:
         plt.show()
     plt.close()
-
 
 def fit_umap(dataframe, n_components=3):
     # Configure UMAP hyperparameters

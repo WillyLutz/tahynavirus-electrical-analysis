@@ -1,6 +1,6 @@
 import os
 
-DISK = "/media/willylutz/TOSHIBA EXT/Electrical activity analysis/TAHINAVIRUS"
+DISK = "/media/wlutz/TOSHIBA EXT/Electrical activity analysis/TAHINAVIRUS/"
 
 DATA = os.path.join(DISK, "DATA")
 RESULTS = os.path.join(DISK, "RESULTS")
