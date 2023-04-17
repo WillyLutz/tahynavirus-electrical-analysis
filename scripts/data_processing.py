@@ -8,6 +8,7 @@ import numpy as np
 import machine_learning as ml
 import fiiireflyyy.firelearn as fl
 import fiiireflyyy.firefiles as ff
+import fiiireflyyy.fireprocess as fp
 from pathlib import Path
 import matplotlib.pyplot as plt
 import PATHS as P
@@ -180,7 +181,7 @@ def make_filtered_sampled_freq_files(f):
     print(f)
     df = pd.read_csv(f)
     df_top = top_n_electrodes(df, 35, "TimeStamp")
-    samples = equal_samples(df_top, 30)
+    samples = fp.equal_samples(df_top, 30)
     channels = df_top.columns
     n_sample = 0
     for df_s in samples:

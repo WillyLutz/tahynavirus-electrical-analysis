@@ -31,12 +31,59 @@ from sklearn.decomposition import PCA
 
 
 def main():
-    for batch in ["batch 1", "batch 2", "batch 12", ]:
-        fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch)
+    min_freq = 0
+    max_freq = 5000
+    for batch in ["batch 1", ]:
+        timepoint = "T=48H"
+        show = False
+        percentiles = 0.1
+        batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
+                   "batch 4": ["10", "11", "12"],
+                   "batch 1_2": ["1", "2", "3", "4", "5", "6", ], "batch 1_4": ["1", "2", "3", "10", "11", "12", ],
+                   "batch 2_4": ["4", "5", "6", "10", "11", "12"],
+                   "all slices": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]}
+
+        class1_2 = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
+                                                   to_include=("freq_50hz_sample", timepoint),
+                                                   to_exclude=("TTX", "RG27",),
+                                                   verbose=False,
+                                                   save=False,
+                                                   freq_range=(min_freq, max_freq),
+                                                   select_samples=batches[batch],
+                                                   separate_samples=False,
+                                                   label_comment="",
+                                                   target_keys={'NI': 'Mock', 'TAHV': 'Tahv'})
+        discarded_class1_2 = fp.discard_outliers_by_iqr(class1_2, low_percentile=percentiles,
+                                                        high_percentile=1 - percentiles,
+                                                        mode='capping')
+        class3 = fp.make_dataset_from_freq_files(parent_dir=P.RG27,
+                                                 to_include=("freq_50hz_sample", timepoint),
+                                                 to_exclude=("TTX", "NI"),
+                                                 verbose=False,
+                                                 save=False,
+                                                 freq_range=(min_freq, max_freq),
+                                                 select_samples=batches[batch],
+                                                 separate_samples=False,
+                                                 label_comment="",
+                                                 target_keys={'NI': 'RG27-treated Mock', 'TAHV': 'RG27-treated Tahv'})
+        discarded_class3 = fp.discard_outliers_by_iqr(class3, low_percentile=percentiles,
+                                                      high_percentile=1 - percentiles,
+                                                      mode='capping')
+        mock = discarded_class1_2.loc[discarded_class1_2["label"] == "Mock"].mean(axis=0)
+        tahv = discarded_class1_2.loc[discarded_class1_2["label"] == "Tahv"].mean(axis=0)
+        rg27 = discarded_class3.loc[discarded_class3["label"] == "RG27-treated Tahv"].mean(axis=0)
+        plt.plot(mock, color="green", alpha=.5, label="mock")
+        plt.plot(tahv, color="blue", alpha=.5, label="tahv")
+        plt.plot(rg27, color='red', alpha=.5, label="rg27-treated Tahv")
+        plt.legend()
+        plt.show()
+
+
+# fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27("batch 3")
 
 
 def fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch):
-    show = False
+    show = True
     percentiles = 0.1
     n_components = 2
     batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
@@ -59,34 +106,8 @@ def fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch):
                                                   high_percentile=1 - percentiles,
                                                   mode='capping')
 
-    tahv_rg27 = fp.make_dataset_from_freq_files(parent_dir=P.RG27,
-                                                to_include=("freq_50hz_sample", "T=48H", "RG27"),
-                                                to_exclude=("TTX", "NI"),
-                                                target_keys={"NI": "NI", "TAHV": "TAHV"},
-                                                verbose=False,
-                                                save=False,
-                                                freq_range=(min_freq, max_freq),
-                                                select_samples=batches[batch],
-                                                separate_samples=False,
-                                                label_comment="")
-
-    discarded_tahv_rg27 = fp.discard_outliers_by_iqr(tahv_rg27, low_percentile=percentiles,
-                                                     high_percentile=1 - percentiles,
-                                                     mode='capping')
-
-    discarded_tahvni.replace("NI", "Mock", inplace=True)
-    discarded_tahvni.replace("TAHV", "Tahv", inplace=True)
-    discarded_tahv_rg27.replace("TAHV", "RG27-treated Tahv", inplace=True)
-    rfc, _ = fl.train_RFC_from_dataset(discarded_tahvni)
-
-    global_df = pd.concat([discarded_tahvni, discarded_tahv_rg27], ignore_index=True)
-    fl.test_model_by_confusion(rfc, global_df, training_targets=(f'Mock', f'Tahv'),
-                               testing_targets=(
-                                   f'Mock', f'Tahv', f'RG27-treated Tahv',),
-                               show=show, verbose=False, savepath=P.RESULTS,
-                               title=f"Fig Confusion matrix train on T=48H Mock,Tahv test on Mock,Tahv,Stachel for {batch} "
-                                     f"{min_freq}-{max_freq}Hz",
-                               iterations=5, )
+    pca, pcdf, ratios = fl.fit_pca(discarded_tahvni, n_components=3)
+    fl.plot_pca(pcdf, ratios=())
 
 
 now = datetime.datetime.now()
