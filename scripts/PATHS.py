@@ -7,6 +7,9 @@ RESULTS = os.path.join(DISK, "RESULTS")
 MODELS = os.path.join(DISK, "MODELS")
 DATASETS = os.path.join(DISK, "DATASETS")
 
+SPIKES_NATURE = os.path.join(RESULTS, "Nature of periodic spikes")
+BATCH_RELIABILITY = os.path.join(RESULTS, "Batch reliability")
+
 NODRUG = os.path.join(DATA, "-DRUG")
 RG27 = os.path.join(DATA, "RG27")
 CPZ = os.path.join(DATA, "CPZ")

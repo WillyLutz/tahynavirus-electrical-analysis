@@ -11,14 +11,20 @@ def make_envelope(y, threshold, distance):
     return peaks
 
 
-def butter_filter(signal, order, lowcut):
-    freq = 10000
-    nyq = 0.5 * freq
-    low = lowcut / nyq
-    high = nyq / nyq
-
-    b, a = butter(order, low, btype='highpass')
-    w, h = freqz(b, a)
+def butter_filter(signal, order, btype, lowcut=None, highcut=None, cut=None, fs=10000 ):
+    nyq = 0.5 * fs
+    if cut:
+        midcut = cut / nyq
+    if lowcut:
+        low = lowcut / nyq
+    if highcut:
+        high = highcut / nyq
+    if btype in ["highpass", "lowpass"]:
+        b, a = butter(order, midcut, btype=btype)
+        w, h = freqz(b, a)
+    elif btype in ["bandstop", "bandpass"]:
+        b, a = butter(order, [low, high], btype=btype)
+        w, h = freqz(b, a)
 
     #xanswer = (w / (2 * np.pi)) * freq
     #yanswer = 20 * np.log10(abs(h))

@@ -14,7 +14,7 @@ import numpy as np
 
 
 def Confusion_matrix(min_freq=0, max_freq=5000, batch="batch 2", timepoint="T=48H"):
-    show = False
+    show = True
     percentiles = 0.1
     batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
                "batch 4": ["10", "11", "12"],
@@ -72,7 +72,7 @@ def Confusion_matrix(min_freq=0, max_freq=5000, batch="batch 2", timepoint="T=48
     global_df = pd.concat([discarded_class1, discarded_class2, discarded_class3, ], ignore_index=True)
     savepath = os.path.join(P.RESULTS, batch)
     ff.verify_dir(savepath)
-    fl.test_model_by_confusion(rfc, global_df, training_targets=(f'Mock', f'Tahv'),
+    fl.test_rfc_by_confusion(rfc, global_df, training_targets=(f'Mock', f'Tahv'),
                                testing_targets=tuple(set(list((
                                    f'Mock', f'Tahv', f'RG27-treated\nTahv',)))),
                                show=show, verbose=False, savepath=savepath,

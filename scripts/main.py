@@ -23,93 +23,80 @@ from scipy.spatial import ConvexHull, convex_hull_plot_2d
 import fiiireflyyy.firelearn as fl
 import fiiireflyyy.firefiles as ff
 import fiiireflyyy.fireprocess as fp
+from scipy.stats.stats import pearsonr
 
 pd.set_option('display.max_columns', None)
 import complete_procedures as cp
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
+from scipy.signal import find_peaks
 
 
 def main():
-    min_freq = 0
-    max_freq = 5000
-    for batch in ["batch 1", ]:
-        timepoint = "T=48H"
-        show = False
-        percentiles = 0.1
-        batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
-                   "batch 4": ["10", "11", "12"],
-                   "batch 1_2": ["1", "2", "3", "4", "5", "6", ], "batch 1_4": ["1", "2", "3", "10", "11", "12", ],
-                   "batch 2_4": ["4", "5", "6", "10", "11", "12"],
-                   "all slices": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]}
-
-        class1_2 = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
-                                                   to_include=("freq_50hz_sample", timepoint),
-                                                   to_exclude=("TTX", "RG27",),
-                                                   verbose=False,
-                                                   save=False,
-                                                   freq_range=(min_freq, max_freq),
-                                                   select_samples=batches[batch],
-                                                   separate_samples=False,
-                                                   label_comment="",
-                                                   target_keys={'NI': 'Mock', 'TAHV': 'Tahv'})
-        discarded_class1_2 = fp.discard_outliers_by_iqr(class1_2, low_percentile=percentiles,
-                                                        high_percentile=1 - percentiles,
-                                                        mode='capping')
-        class3 = fp.make_dataset_from_freq_files(parent_dir=P.RG27,
-                                                 to_include=("freq_50hz_sample", timepoint),
-                                                 to_exclude=("TTX", "NI"),
-                                                 verbose=False,
-                                                 save=False,
-                                                 freq_range=(min_freq, max_freq),
-                                                 select_samples=batches[batch],
-                                                 separate_samples=False,
-                                                 label_comment="",
-                                                 target_keys={'NI': 'RG27-treated Mock', 'TAHV': 'RG27-treated Tahv'})
-        discarded_class3 = fp.discard_outliers_by_iqr(class3, low_percentile=percentiles,
-                                                      high_percentile=1 - percentiles,
-                                                      mode='capping')
-        mock = discarded_class1_2.loc[discarded_class1_2["label"] == "Mock"].mean(axis=0)
-        tahv = discarded_class1_2.loc[discarded_class1_2["label"] == "Tahv"].mean(axis=0)
-        rg27 = discarded_class3.loc[discarded_class3["label"] == "RG27-treated Tahv"].mean(axis=0)
-        plt.plot(mock, color="green", alpha=.5, label="mock")
-        plt.plot(tahv, color="blue", alpha=.5, label="tahv")
-        plt.plot(rg27, color='red', alpha=.5, label="rg27-treated Tahv")
-        plt.legend()
-        plt.show()
-
-
-# fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27("batch 3")
-
-
-def fig_confusion_matrix_train_on_batch_Mock_tahv_0_5000Hz_test_on_rg27(batch):
-    show = True
+    timepoint = "T=48H"
+    min_freq = 500
+    max_freq = 3000
     percentiles = 0.1
-    n_components = 2
     batches = {"batch 1": ["1", "2", "3"], "batch 2": ["4", "5", "6", ], "batch 3": ["7", "8", "9", ],
-               "batch 12": ["1", "2", "3", "4", "5", "6", ],
-               "all slices": ["1", "2", "3", "4", "5", "6", "7", "8", "9"]}
-    min_freq = 0
-    max_freq = 5000
-    tahvni = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
-                                             to_include=("freq_50hz_sample", "T=48H"),
-                                             to_exclude=("TTX", "RG27",),
-                                             target_keys={"NI": "NI", "TAHV": "TAHV"},
-                                             verbose=False,
-                                             save=False,
-                                             freq_range=(min_freq, max_freq),
-                                             select_samples=batches[batch],
-                                             separate_samples=False,
-                                             label_comment="")
+               "batch 4": ["10", "11", "12"],
+               "batch 1_2": ["1", "2", "3", "4", "5", "6", ], "batch 1_4": ["1", "2", "3", "10", "11", "12", ],
+               "batch 2_4": ["4", "5", "6", "10", "11", "12"],
+               "all slices": ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"]}
 
-    discarded_tahvni = fp.discard_outliers_by_iqr(tahvni, low_percentile=percentiles,
+    class1_df = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
+                                                to_include=("odd_harmonics", timepoint),
+                                                to_exclude=("TTX", "RG27", "TAHV"),
+                                                verbose=False,
+                                                save=False,
+                                                freq_range=(min_freq, max_freq),
+                                                select_samples=batches["batch 1"],
+                                                separate_samples=False,
+                                                label_comment=f"",
+                                                target_keys={'NI': 'Mock b1',
+                                                             'TAHV': 'Tahv b1'})  # IMPORTANT, else it may result in an empty dataframe
+    discarded_class1 = fp.discard_outliers_by_iqr(class1_df, low_percentile=percentiles,
+                                                  high_percentile=1 - percentiles,
+                                                  mode='capping')
+    class2_df = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
+                                                to_include=("odd_harmonics", timepoint),
+                                                to_exclude=("TTX", "RG27", "TAHV"),
+                                                verbose=False,
+                                                save=False,
+                                                freq_range=(min_freq, max_freq),
+                                                select_samples=batches["batch 2"],
+                                                separate_samples=False,
+                                                label_comment=f"",
+                                                target_keys={'NI': 'Mock b2',
+                                                             'TAHV': 'Tahv b2'})  # IMPORTANT, else it may result in an empty dataframe
+    discarded_class2 = fp.discard_outliers_by_iqr(class2_df, low_percentile=percentiles,
+                                                  high_percentile=1 - percentiles,
+                                                  mode='capping')
+    class3_df = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
+                                                to_include=("odd_harmonics", timepoint),
+                                                to_exclude=("TTX", "RG27", "TAHV"),
+                                                verbose=False,
+                                                save=False,
+                                                freq_range=(min_freq, max_freq),
+                                                select_samples=batches["batch 4"],
+                                                separate_samples=False,
+                                                label_comment=f"",
+                                                target_keys={'NI': 'Mock b4',
+                                                             'TAHV': 'Tahv b4'})  # IMPORTANT, else it may result in an empty dataframe
+    discarded_class3 = fp.discard_outliers_by_iqr(class3_df, low_percentile=percentiles,
                                                   high_percentile=1 - percentiles,
                                                   mode='capping')
 
-    pca, pcdf, ratios = fl.fit_pca(discarded_tahvni, n_components=3)
-    fl.plot_pca(pcdf, ratios=())
+    global_df = pd.concat([discarded_class1, discarded_class2, discarded_class3], ignore_index=True)
+    rfc, _ = fl.train_RFC_from_dataset(global_df)
 
 
+    fl.test_rfc_by_confusion(rfc, global_df, training_targets=(f'Mock b1', f'Mock b2', f'Mock b4'),
+                             testing_targets=tuple(set(list((
+                                 f'Mock b1', f'Mock b2', f'Mock b4',)))),
+                             show=True, verbose=False, #savepath=os.path.join(P.RESULTS, batch),
+                             title=f"Confusion matrix train on {timepoint} Mock between batches 1, 2 and 4 "
+                                   f"50-3000 Hz odd harmonics",
+                             iterations=5, )
 now = datetime.datetime.now()
 print(now)
 main()
