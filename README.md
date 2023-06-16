@@ -12,10 +12,7 @@ You can also check out [other repositories with a similar use](#other-repositori
 
 
 ## Development context
-This project is developed in the context of public research in biology. It has been developed as support for the 
-publication <ins>_**Emma Partiot, Aurélie Hirschler, Sophie Colomb, Willy Lutz, Tine Claeys, François
-Delalande, et al. Trans-synaptic dwelling of SARS-CoV-2 particles perturbs neural synapse
-organization and function. BioRxiv. 2022.**_</ins>.
+This project is developed in the context of public research in biology. It has been developed as support for a publication not disclosed here.
 
 ## Visuals and resulting figures
 On this part you will have a quick overview on the different resulting figures possible with this project. They will be given without context and are for 
