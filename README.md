@@ -1,92 +1,206 @@
-# Tahynavirus Electrical Analysis
-
-
-
-## Getting started
-
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
-
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
-
-## Add your files
-
-- [ ] [Create](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#create-a-file) or [upload](https://docs.gitlab.com/ee/user/project/repository/web_editor.html#upload-a-file) files
-- [ ] [Add files using the command line](https://docs.gitlab.com/ee/gitlab-basics/add-file.html#add-a-file-using-the-command-line) or push an existing Git repository with the following command:
-
-```
-cd existing_repo
-git remote add origin https://gitlab.com/FiiireFlyyy/tahinavirus-electrical-analysis.git
-git branch -M main
-git push -uf origin main
-```
-
-## Integrate with your tools
-
-- [ ] [Set up project integrations](https://gitlab.com/FiiireFlyyy/tahinavirus-electrical-analysis/-/settings/integrations)
-
-## Collaborate with your team
-
-- [ ] [Invite team members and collaborators](https://docs.gitlab.com/ee/user/project/members/)
-- [ ] [Create a new merge request](https://docs.gitlab.com/ee/user/project/merge_requests/creating_merge_requests.html)
-- [ ] [Automatically close issues from merge requests](https://docs.gitlab.com/ee/user/project/issues/managing_issues.html#closing-issues-automatically)
-- [ ] [Enable merge request approvals](https://docs.gitlab.com/ee/user/project/merge_requests/approvals/)
-- [ ] [Automatically merge when pipeline succeeds](https://docs.gitlab.com/ee/user/project/merge_requests/merge_when_pipeline_succeeds.html)
-
-## Test and Deploy
-
-Use the built-in continuous integration in GitLab.
-
-- [ ] [Get started with GitLab CI/CD](https://docs.gitlab.com/ee/ci/quick_start/index.html)
-- [ ] [Analyze your code for known vulnerabilities with Static Application Security Testing(SAST)](https://docs.gitlab.com/ee/user/application_security/sast/)
-- [ ] [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/ee/topics/autodevops/requirements.html)
-- [ ] [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/ee/user/clusters/agent/)
-- [ ] [Set up protected environments](https://docs.gitlab.com/ee/ci/environments/protected_environments.html)
-
-***
-
-# Editing this README
-
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thank you to [makeareadme.com](https://www.makeareadme.com/) for this template.
-
-## Suggestions for a good README
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
-
-## Name
-Choose a self-explaining name for your project.
+# Electrical signal analysis : Tahynavirus infected brain slices
 
 ## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+Its aim is to provide signal processing and machine learning solutions for electrical signal analysis. 
+In this specific case it has been used on human brain slices. It allows the user to use different analysis and 
+data processing procedures. In those you can find smoothing, Fast-Fourier-Transform, data augmentation algorithms and others.
+Those procedures have been optimized for this very project in this repository, so you may want to adapt it in many ways for your own usage.
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+For more information on the possible usages, please refer to the [corresponding section](#usage).
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+You can also check out [other repositories with a similar use](#other-repositories-with-similar-use)
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+
+## Development context
+This project is developed in the context of public research in biology. It has been developed as support for the 
+publication <ins>_**Emma Partiot, Aurélie Hirschler, Sophie Colomb, Willy Lutz, Tine Claeys, François
+Delalande, et al. Trans-synaptic dwelling of SARS-CoV-2 particles perturbs neural synapse
+organization and function. BioRxiv. 2022.**_</ins>.
+
+## Visuals and resulting figures
+On this part you will have a quick overview on the different resulting figures possible with this project. They will be given without context and are for 
+illustration purpose only, and may not be relevant with the actual article this github is from.
+
+### Frequency/power plots
+Plot your signal in the frequency domain.
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/smoothened_frequencies.png" width=250 height=250>
+
+### Amplitude barplot
+Compute the average power and variation of different labels. Allows a restriction to a specific frequency range.
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/barplot_amplitude.png" width=250 height=250>
+
+### 2D PCA plot
+Fit a Principal Component Analysis on you data and plot it in a two-dimensionnal space. You can also decide to fit the
+model only on a few label, then apply the transformation to another !
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/pca_2D.png" width=250 height=250>
+
+### 3D PCA plot
+Fit a Principal Component Analysis on you data and plot it in a three-dimensionnal space. You can also decide to fit the
+model only on a few label, then apply the transformation to another !
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/PCA_3D.png" width=250 height=250>
+
+### Confusion matrix
+Used to check the performance of a machine learning model, here Random Forest Classifier. You can train on specific label
+and test you model on different ones, to see where the model classify them among the training labels.
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/confusion_matrix.png" width=600 height=200>
+
+### Feature importance
+Plot the relative importance of the features for a trained RFC model.
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/feature_importance.png" width=250 height=250> 
+
+## Data acquisition
+The signal has been recorded at 10 kHz, with a MEA 60 channels electrode. 
+For more information about the array, refer to [their page](https://www.multichannelsystems.com/products/60-3dmea2001280ir-ti-gr). Each recording has been 
+done 3 times,on a minimum of 3 brain slices per test batch.
+
+
+## Data formatting 
+For most (if not all) of the analysis, a certain data format will be needed. Any modification on the data format may 
+induce errors and bugs for the good use of the project.
+
+
+### Project organization
+```bash
+├── TAHYNAVIRUS
+│   ├── scripts
+│   │   ├── complete_procedures.py
+│   │   ├── data_processing.py
+│   │   ├── machine_learning.py
+│   │   ├── main.py
+│   │   ├── PATHS.py
+│   │   ├── signal_processing.py
+│   ├── venv
+
+```
+
+### Organizing the data
+To use efficiently the project, a certain architecture will be needed when organizing the data.
+```bash
+├── base
+│   ├── DATASET
+│   ├── MODELS
+│   ├── RESULTS
+│   │   ├── Figures README Paper
+│   │   │   ├──myfigures.png
+│   │   ├──myfigures.png
+│   ├── DATA
+│   │   ├── drug condition*
+│   │   │   ├── recording time**
+│   │   │   │   ├── cell condition***
+│   │   │   │   │   ├── samples****
+│   │   │   │   │   │   ├── myfiles.csv*****
+```
+* E.g. '-RG10b', '+RG10b'
+
+** Must follow the format T=[time][H/MIN]. E.g. 'T=48H', 'T=0MIN', 'T=30MIN'.
+
+*** What you want to classify. E.g. 'TAHV', 'NI'. 
+
+**** The sample number. E.g. '1', '2'... 
+
+***** The files that contain the data. They must follow a [certain format](#data-format).
+
+In the data folder, you can multiply every directory as much as you have conditions.
+
+### Data format
+Across all the analysis, multiple data type will be generated. For all the files generated, it is recommended to keep tracks of the
+different conditions of this very data in the file name.
+
+#### Raw file
+Usually of format similar as following:
+
+```2022-09-16T14-02-25t=48h NI1 NODRUG_D-00145_Recording-0_(Data Acquisition (1);MEA2100-Mini; Electrode Raw Data1)_Analog.csv```
+
+This type of file contains the raw output in csv format of the electrode array. It may look as following:
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/sshot_raw_file_sarscov.png" width=950 heigth=320>
+
+#### Processed format
+Usually of format similar as following: 
+```pr_2022-09-16T14-03-55.csv```
+
+In fact it is equivalent to the raw file with only th data (beheaded of the information headlines).
+It may look like:
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/sshot_pr_file_sarscov.png" width=950 heigth=230>
+
+The column headers are normalized to function with the project. Other headers will not function without modifying directly the code.
+
+#### Frequencies format
+Usually a format similar as following: 
+```freq_50hz_sample29_2022-09-16T14-05-24.csv```
+
+It is the result of the Fast Fourier Transform applied on the average signal across the channels (after channel selection) from the processed files. It mayt look like this:
+
+<img src="https://github.com/WillyLutz/electrical-analysis-sars-cov-2/blob/main/Figures_README/sshot_freq_file_sarscov.png" width=200 heigth=300>
+
+The column headers 'mean' and 'Frequency [Hz]' are normalized to function with the project. Other headers will not function without modifying directly the code.
+
+## Development specification
+Language: Python 3.10
+
+OS: Ubuntu 22.04.1 LTS
 
 ## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+This part will help you getting started with the use of this project. Please note that this project has heavy dependance on the python package `fiiireflyyy`, developed by the same author. 
+
+#### The PATHS.py file
+After succesfully cloning the repository as an IDE project, the first thing you want to do is to modify the constants used for this project, such as the absolute paths. 
+
+Go to the file `PATHS.py`.
+```python
+DISK = "/media/wlutz/TOSHIBA EXT/Electrical activity analysis/TAHYNAVIRUS/DATA"
+```
+
+This first path is what is referred as `base` in the [data organisation](#organizing-the-data). Replace it by your own absolute path. From the `DISK` path, each and every data used or generated by the project will be under it.
+
 
 ## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
-
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+For any support request, you can either use this project issue tracker, or state your request at <willy.lutz@irim.cnrs.fr> by precising in the object the name of this repository followed by the summarized issue.
 
 ## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
-
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
-
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+This project is open to any suggestion on the devlelopment and methods. 
 
 ## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+Author: Willy LUTZ
+
+Principal investigator: Raphaël Gaudin
+
+Context: MDV Team, IRIM, CNRS, Montpellier 34000, France.
 
 ## License
-For open source projects, say how it is licensed.
+This open source project is under the MIT Licence.
+
+MIT License
+
+Copyright (c) [2023] [Electrical signal analysis : SARS-CoV-2 infected organoids]
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+on going
+
+## Other repositories with similar use
+From the same author:
+- no information disclosed for the moment 
