@@ -1,142 +1,118 @@
 import datetime
-import shutil
-import time
-
-import pandas as pd
 import os
-import fileinput
+
+from fiiireflyyy.files import get_all_files
+import fiiireflyyy.learn as fl
+import fiiireflyyy.process as fp
+import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
-import sklearn
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split, KFold, cross_val_score
-import signal_processing as spr
-import data_processing as dpr
-import machine_learning as ml
-import seaborn as sns
-import PATHS as P
-import data_processing as dp
-import pickle
-import forestci as fci
-from pathlib import Path
-from scipy.spatial import ConvexHull, convex_hull_plot_2d
-import fiiireflyyy.firelearn as fl
-import fiiireflyyy.firefiles as ff
-import fiiireflyyy.fireprocess as fp
-from scipy.stats.stats import pearsonr
+from sklearn.model_selection import train_test_split
 
-pd.set_option('display.max_columns', None)
-import complete_procedures as cp
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from scipy.signal import find_peaks
+from scripts.pipelines import confusion, pca, feature_importance
 
+save = "/media/wlutz/TOSHIBA EXT/Electrical activity analysis/TAHINAVIRUS/RESULTS/Review + donors D+E"
+merge = "datasets/merge ni tahv rg27 t0 t30 t48 all donors separated.csv"
+
+dataset_path = "/media/wlutz/TOSHIBA EXT/Electrical activity analysis/TAHINAVIRUS/DATASETS/"
 
 def main():
-    class1_df = fp.make_dataset_from_freq_files(parent_dir=P.NODRUG,
-                                                to_include=("odd_harmonics", timepoint),
-                                                to_exclude=("TTX", "RG27", "flattened", "TAHV"),
-                                                verbose=False,
-                                                save=False,
-                                                freq_range=(min_freq, max_freq),
-                                                select_samples=batches["batch 4"],
-                                                separate_samples=False,
-                                                label_comment=f"",
-                                                target_keys={'NI': 'Mock',
-                                                             'TAHV': 'TAHV'})  # IMPORTANT, else it may result in an empty dataframe
-    discarded_class1 = fp.discard_outliers_by_iqr(class1_df, low_percentile=percentiles,
-                                                  high_percentile=1 - percentiles,
-                                                  mode='capping')
+    df = pd.read_csv(dataset_path+"NI T48 All donors slices separated.csv")
+    df = df.reset_index(drop=True)
+    # slices = ["Slice 1", "Slice 2", "Slice 3"]
+    # slices = ["Slice 4", "Slice 5", "Slice 6"]
+    # slices = ["Slice 7", "Slice 8", "Slice 9"]
+    # slices = ["Slice 10", "Slice 11", "Slice 12"]
+    
+    df = df[df["label"]!='Slice 7']
 
+    indices_to_smooth = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 51, 57, 63, 69, 75, 81, 87, 93,
+                         100, 106, 112, 118, 124, 130, 136, 142, 148, 154, 160, 166]
+    for i in indices_to_smooth:
+        df[str(i)] = df[[str(i-1), str(i+1)]].mean(axis=1)
+
+    df['label'] = df['label'].replace("Slice 1", "Donor A")
+    df['label'] = df['label'].replace("Slice 2", "Donor A")
+    df['label'] = df['label'].replace("Slice 3", "Donor A")
+    df['label'] = df['label'].replace("Slice 4", "Donor B")
+    df['label'] = df['label'].replace("Slice 5", "Donor B")
+    df['label'] = df['label'].replace("Slice 6", "Donor B")
+    df['label'] = df['label'].replace("Slice 7", "Donor B'")
+    df['label'] = df['label'].replace("Slice 8", "Donor B'")
+    df['label'] = df['label'].replace("Slice 9", "Donor B'")
+    df['label'] = df['label'].replace("Slice 10", "Donor C")
+    df['label'] = df['label'].replace("Slice 11", "Donor C")
+    df['label'] = df['label'].replace("Slice 12", "Donor C")
+
+    
+    train = [list(set(list(df["label"])))]
+    
     percentiles = 0.1
-    base = "/home/wlutz/PycharmProjects/tahynavirus-electrical-analysis/datasets"
-    t0mock = pd.read_csv(f'{base}/DATASET_T=0 MOCK.csv')
-    dt0mock = fp.discard_outliers_by_iqr(t0mock, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                         mode='capping')
-    dt0mock['label'].replace('Mock', 'Mock\n0min', inplace=True)
 
-    t0vlpp = pd.read_csv(f'{base}/DATASET_T=0 VLP+.csv')
-    dt0vlpp = fp.discard_outliers_by_iqr(t0vlpp, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                         mode='capping')
-    dt0vlpp['label'].replace('VLP+', 'VLP+\n0min', inplace=True)
+    # random split train test for train labels
+    # discarding outliers
+   
+    
+    pca, pcdf, ratio = fl.fit_pca(df, 2)
+    
 
-    t24mock = pd.read_csv(f'{base}/DATASET_T=24H MOCK.csv')
-    dt24mock = fp.discard_outliers_by_iqr(t24mock, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                          mode='capping')
-    dt24mock['label'].replace('Mock', 'Mock\n24h', inplace=True)
-
-    t0spike = pd.read_csv(f'{base}/DATASET_T=0 SPIKE.csv')
-    dt0spike = fp.discard_outliers_by_iqr(t0spike, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                          mode='capping')
-    dt0spike['label'].replace('Spike', 'Spike\n0min', inplace=True)
-
-    t0inf = pd.read_csv(f'{base}/DATASET_T=0 INF.csv')
-    dt0inf = fp.discard_outliers_by_iqr(t0inf, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                        mode='capping')
-    dt0inf['label'].replace('Sars-CoV', 'Sars-CoV\n0min', inplace=True)
-
-    t24inf = pd.read_csv(f'{base}/DATASET_T=24H INF.csv')
-    dt24inf = fp.discard_outliers_by_iqr(t24inf, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                         mode='capping')
-    dt24inf['label'].replace('Sars-CoV', 'Sars-CoV\n24h', inplace=True)
-
-    rfc, _ = fl.train_RFC_from_dataset(pd.concat([dt0mock,
-                                                  dt0inf,
-                                                  dt0vlpp,
-                                                  dt0spike,
-                                                  dt24mock,
-                                                  dt24inf], ignore_index=True), )
-
-    inf = pd.read_csv(f'{base}/DATASET_T=24H INF.csv')
-    dinf = fp.discard_outliers_by_iqr(inf, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                      mode='capping')
-    dinf['label'].replace('Sars-CoV', 'Sars-CoV\n24h', inplace=True)
-
-    vlpp = pd.read_csv(f'{base}/DATASET_T=24H VLP+.csv')
-    dvlpp = fp.discard_outliers_by_iqr(vlpp, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                       mode='capping')
-    dvlpp['label'].replace('VLP+', 'VLP+\n24h', inplace=True)
-
-    spike = pd.read_csv(f'{base}/DATASET_T=24H SPIKE.csv')
-    dspike = fp.discard_outliers_by_iqr(spike, low_percentile=percentiles, high_percentile=1 - percentiles,
-                                        mode='capping')
-    dspike['label'].replace('Spike', 'Spike\n24h', inplace=True)
-
-    testdf = pd.concat([dvlpp, dinf, dspike, ], ignore_index=True)
-
-    # globaldf = pd.concat([traindf, testdf], ignore_index=True)
-    globaldf = pd.concat([dt0mock,
-                          dt0inf,
-                          dt0vlpp,
-                          dt0spike,
-                          dt24mock,
-                          dinf,
-                          dspike,
-                          dvlpp, ], ignore_index=True)
-
-    fl.test_rfc_by_confusion(rfc, globaldf, training_targets=('Mock\n0min',
-                                                              'Sars-CoV\n0min',
-                                                              'VLP+\n0min',
-                                                              'Spike\n0min',
-                                                              'Mock\n24h',
-                                                              'Sars-CoV\n24h'),
-                             testing_targets=tuple(set(list(('Mock\n0min',
-                                                             'Sars-CoV\n0min',
-                                                             'VLP+\n0min',
-                                                             'Spike\n0min',
-                                                             'Mock\n24h',
-                                                             'Sars-CoV\n24h',
-                                                             'VLP+\n24h',
-                                                             'Spike\n24h')))),
-                             show=True, verbose=False, savepath='',
-                             title=f"",
-                             iterations=5, )
-
-    # training(mock0, vlp-0, vlp+0, spike0, inf0, mock24 as MOCK and inf24 as INF) testing()
+    # random split train test for test labels
+    df_test_labels = pd.DataFrame()
+    test_pcdf = pd.DataFrame()
+    
+    
+    fl.plot_pca(pd.concat([pcdf, test_pcdf], ignore_index=True), n_components=2,
+                show=True,
+                metrics=True,
+                savedir='',
+                title='',
+                ratios=[round(x*100, 2) for x in ratio],
+                dpi=300)
+    
+    
+    # for s in range(len(slices)):
+    #     sliceA = df[df["label"] == slices[s]]
+    #     sliceA_mean = sliceA.mean(axis=0)
+    #     sliceA_std = sliceA.std(axis=0)
+    #     plt.plot(sliceA_mean,label=slices[s])
+    #     plt.fill_between(x=[x for x in range(len(sliceA_mean))], y1=sliceA_mean.sub(sliceA_std), y2=sliceA_mean.add(sliceA_std), alpha=0.5)
+    # for donor in list(set(list(df["label"]))):
+    #     sliceA = df[df["label"] == donor]
+    #     sliceA_mean = sliceA.mean(axis=0)
+    #     sliceA_std = sliceA.std(axis=0)
+    #     plt.plot(sliceA_mean,label=donor)
+    #     plt.fill_between(x=[x for x in range(len(sliceA_mean))], y1=sliceA_mean.sub(sliceA_std), y2=sliceA_mean.add(sliceA_std), alpha=0.5)
+    # plt.legend()
+    # plt.show()
+    #
+    pcdf.to_csv(os.path.join("/media/wlutz/TOSHIBA EXT/Papers/Tahynavirus Basia", f"Figure 3I.csv"), index=False)
+    
+    
+    
+    
+    
+    
+    # for donor in ['A', 'B', 'C', 'D', 'E']:
+    #     confusion([f"NI T48 {donor}", f"TAHV T48 {donor}"], [f"TAHV RG27 T48 {donor}"], merge_path=merge,
+    #               savepath=save,
+    #               title=f'CONFUSION RG27 effect donor {donor} 0-60 features',
+    #               show=False)
+    #
+    #     pca([f"NI T48 {donor}", f"TAHV T48 {donor}"], [f"TAHV RG27 T48 {donor}"], merge_path=merge,
+    #               savepath=save,
+    #               title=f'PCA RG27 effect donor {donor} 0-60 features', show=False)
+    #     feature_importance([f"NI T48 {donor}", f'TAHV T48 {donor}'],
+    #                        mode='impurity',
+    #                        savepath=save,
+    #                        title=f'FEATURE IMPORTANCE donor {donor} impurity 0-60 features',
+    #                        show=False)
+    #
+    #     print(donor, " done")
 
 
 now = datetime.datetime.now()
 print(now)
 main()
+
+# todo : update test_clf_by_confusion, train_RFC_from_dataset, apply_pca, fit_pca
 
 print("RUN:", datetime.datetime.now() - now)
